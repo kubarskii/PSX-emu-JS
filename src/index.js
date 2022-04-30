@@ -8,19 +8,19 @@ import {memory} from "./memory";
 const test_form = document.getElementById("test_form");
 
 const loadFileErrorCb = (e) => {
-    console.warn(e);
+	console.warn(e);
 };
 
 /**
  * Loading file from form on submit
  * */
 test_form.addEventListener("submit", function (e) {
-    e.preventDefault();
-    const file_input = this.file_loader;
-    const fileList = file_input.files;
-    Array.from(fileList).forEach(file => {
-        loadFile(file, loadFileData, loadFileErrorCb);
-    });
+	e.preventDefault();
+	const file_input = this.file_loader;
+	const fileList = file_input.files;
+	Array.from(fileList).forEach(file => {
+		loadFile(file, loadFileData, loadFileErrorCb);
+	});
 });
 
 /**
@@ -28,7 +28,7 @@ test_form.addEventListener("submit", function (e) {
  * @see BINARY_TYPES
  * */
 readAndExecute(BINARY_TYPES.BIOS, (buffer) => {
-    loadFileData(buffer);
-    const bios = new BIOS(new CPU(), memory);
-    bios.run()
+	loadFileData(buffer);
+	const bios = new BIOS(new CPU(), memory);
+	bios.run();
 });

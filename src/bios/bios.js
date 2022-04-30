@@ -10,11 +10,12 @@ export class BIOS {
      * */
     constructor(cpu, memory) {
         this.cpu = cpu;
-        this.memory = memory
+        this.memory = memory;
     }
 
     run() {
         this.cpu.pc = DEFAULT_BIOS_PC;
+
         /**
          *  hook the Kernel after BIOS initialization
          *
@@ -22,14 +23,14 @@ export class BIOS {
          *  https://psx-spx.consoledev.net/expansionportpio/#mid-boot-hook
          * */
         const BIOS_END = 0x80030000;
-
-        do {
-            const operationInMemoryId = this.cpu.getOperation();
+        debugger
+        let k = 0
+        while (k < 10/*this.cpu.registers.pc !== BIOS_END*/) {
+            const pc = this.cpu.pc;
+            const operationInMemoryId = (~DEFAULT_BIOS_PC) & pc;
             const operation = this.memory[operationInMemoryId];
-            this.cpu.execute(operation)
-        } while (false)
-        // while(this.cpu.registers.pc !== BIOS_END) {
-        //
-        // }
+            this.cpu.execute(operation);
+            k++
+        }
     }
 }

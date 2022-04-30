@@ -1,7 +1,7 @@
 import {BIOS_LEN} from "../utils/constants";
 import {UnsupportedDataTypeError} from "../errors/unsupported-data-type";
 
-export class Memory extends Uint32Array{
+export class Memory extends Uint32Array {
 
 	static instance = undefined;
 
@@ -20,19 +20,23 @@ export class Memory extends Uint32Array{
 	}
 
 	/**
-	 * Used to set quaternion of 32 bits value
-	 * @param {number} index - index to be updated
-	 * @param {number} data - data to be set
-	 * */
+     * Used to set quaternion of 32 bits value
+     * @param {number} index - index to be updated
+     * @param {number} data - data to be set
+     * */
 	setInt8(index, data) {
-		if ((data & 0xffffff00) > 0 )
+		if ((data & 0xffffff00) > 0x0)
 			throw new UnsupportedDataTypeError("Data provided does not fit 8 bits size");
 
 		switch (index & 0x3) {
-		case 0: return;
-		case 1: return;
-		case 2: return;
-		case 3: return;
+		case 0:
+			return;
+		case 1:
+			return;
+		case 2:
+			return;
+		case 3:
+			return;
 		}
 	}
 
@@ -40,7 +44,7 @@ export class Memory extends Uint32Array{
 
 	}
 
-	setInt32(index, data){
+	setInt32(index, data) {
 
 	}
 
