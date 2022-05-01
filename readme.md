@@ -10,6 +10,10 @@
 
 ```npm start```
 
+## Running game (FAR FROM RUNNING GAMES)
+
+Download PSX BIOS and game in BIN or ISO format and upload using web form.
+
 ## Development
 
 If you want to commit to the repository, please run linter first and cover code with tests.
@@ -76,3 +80,7 @@ http://problemkaputt.de/psx-spx.htm#cpuspecifications
 ##### ALU
 
 ![ALU opcodes!](docs/images/ALU.png "ALU")
+
+##### Memory Access
+
+![Memory Access!](docs/images/Memory access.png "Memory Access")

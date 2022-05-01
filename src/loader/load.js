@@ -11,18 +11,18 @@ import {memory} from "../memory";
  * @return {void}
  * */
 export const loadFile = (file, onLoad, onErr) => {
-    const reader = new FileReader();
+	const reader = new FileReader();
 
-    reader.onerror = (event) => {
-        console.warn("Error occurred");
-        onErr(event);
-    };
+	reader.onerror = (event) => {
+		console.warn("Error occurred");
+		onErr(event);
+	};
 
-    reader.onload = (event) => {
-        onLoad(event.target.result);
-    };
+	reader.onload = (event) => {
+		onLoad(event.target.result);
+	};
 
-    reader.readAsArrayBuffer(file);
+	reader.readAsArrayBuffer(file);
 };
 
 /**
@@ -30,13 +30,13 @@ export const loadFile = (file, onLoad, onErr) => {
  * @return {never}
  * */
 export const loadFileData = (buffer) => {
-    if (isBios(buffer)) {
-        writeBinaryToLocalStorage(BINARY_TYPES.BIOS, buffer);
-        const data = new Int32Array(buffer);
-        for (let i = 0; i < BIOS_LEN; i += 4) {
-            memory[i >> 2] = data[i >> 2];
-        }
-        return void 0;
-    }
-    throw new UnsupportedDataTypeError(`file MUST be one of: ${Object.values(BINARY_TYPES).join(", ")}`);
+	if (isBios(buffer)) {
+		writeBinaryToLocalStorage(BINARY_TYPES.BIOS, buffer);
+		const data = new Int32Array(buffer);
+		for (let i = 0; i < BIOS_LEN; i += 4) {
+			memory[i >> 2] = data[i >> 2];
+		}
+		return void 0;
+	}
+	throw new UnsupportedDataTypeError(`file MUST be one of: ${Object.values(BINARY_TYPES).join(", ")}`);
 };

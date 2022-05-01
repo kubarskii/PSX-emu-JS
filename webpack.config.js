@@ -6,7 +6,7 @@ const config = {
     entry: {
         index: "./src/index.js"
     },
-    devtool: "source-map",
+    devtool: "eval-source-map",
     resolve: {
         extensions: [".js"]
     },

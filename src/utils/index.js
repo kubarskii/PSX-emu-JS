@@ -24,7 +24,7 @@ export const toHex = (value, len = 8) => {
  * @return {void}
  * */
 export const writeBinaryToLocalStorage = (name, buffer) => {
-	localStorage.setItem(name, JSON.stringify(Array.from(new Uint8Array(buffer))));
+	localStorage.setItem(name, JSON.stringify(Array.from(new Uint32Array(buffer))));
 };
 
 /**
@@ -39,7 +39,7 @@ export const readBinaryFromLocalStorage = (name) => {
 		return null;
 
 	const arr = JSON.parse(binaryString);
-	const uint_8_arr = new Uint8Array(arr);
+	const uint_8_arr = new Uint32Array(arr);
 	return uint_8_arr.buffer;
 };
 

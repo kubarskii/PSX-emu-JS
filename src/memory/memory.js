@@ -40,12 +40,12 @@ export class Memory extends Uint32Array {
 		}
 	}
 
-	setInt16(index, data) {
-
-	}
-
-	setInt32(index, data) {
-
-	}
+	// setInt16(index, data) {
+	//
+	// }
+	//
+	// setInt32(index, data) {
+	//
+	// }
 
 }

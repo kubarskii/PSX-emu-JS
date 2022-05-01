@@ -39,10 +39,12 @@ describe("Instruction tests", () => {
 	});
 
 	it("should get register rs from instruction", () => {
-		const instruction = i(0x12345678);
-		// 10001
-		const rs = instruction.rs();
-		expect(rs).toBe(0x11);
+		const ins = i(0x12345678);
+		const ins2 = i(parseInt("00000011111000000000000000000000", 2));
+		const ins3 = i(parseInt("00110101000010000010010000111111", 2));
+		expect(ins.rs()).toBe(0x11);
+		expect(ins2.rs()).toBe(0x1f);
+		expect(ins3.rs()).toBe(0x8);
 	});
 
 	it("should get address from instruction", () => {

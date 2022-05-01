@@ -1,12 +1,11 @@
 /**
  * instruction "prototype holder" to create functional object
  *  */
-function Instruction(value) {
+function Instruction() {
 }
 
 /**
  * Return bits [31:26] of the instruction that is operation id
- * @param {number} instruction
  * @return {number} - operation id
  * */
 Instruction.prototype.opcode = function () {
@@ -29,7 +28,6 @@ Instruction.prototype.rs = function () {
  * 000000 00000 00000 00000 00000 000000
  *              ^^^^
  * Return bits [20:16] of the instruction that is register ID
- * @param {number} instruction
  * @return {number} - Register id from 0 to 31
  * */
 Instruction.prototype.rt = function () {
@@ -99,13 +97,13 @@ Instruction.prototype.address = function () {
 };
 
 
-
 export function instruction(v) {
 	const fn = (v) => {
 		fn.value = v;
+		// const isRegister = ((v >> 6) & 0x1f) === 0x0;
 		return fn;
 	};
 	Object.setPrototypeOf(fn, Instruction.prototype);
-	return Object.assign(fn, {value: undefined})(v);
+	return Object.assign(fn, {value: undefined, type: undefined})(v);
 }
 

@@ -7,7 +7,8 @@
     "start": "webpack-dev-server",
     "test": "jest",
     "lint": "eslit .",
-    "lint:fix": "eslint --fix ."
+    "lint:fix": "eslint --fix .",
+    "prepare": "husky install"
   },
   "author": "",
   "license": "ISC",
@@ -21,6 +22,7 @@
     "cross-env": "^7.0.3",
     "eslint": "^8.14.0",
     "eslint-plugin-jest": "^26.1.5",
+    "husky": "^7.0.4",
     "jest": "^28.0.1",
     "jest-cli": "^28.0.1",
     "jest-environment-jsdom": "^28.0.2",
