@@ -22,6 +22,8 @@ If you want to commit to the repository, please run linter first and cover code 
 
 Memory map: https://psx-spx.consoledev.net/memorymap/
 
+fffe0130
+
 | KUSEG (Virtual) | KSEG0 (Physical Mirror with Cache) | KSEG1 (Physical) | Memory size | Type                                                |
 |-----------------|------------------------------------|------------------|-------------|-----------------------------------------------------|
 | 00000000h       | 80000000h                          | A0000000h        | 2048K       | Main RAM (first 64K reserved for BIOS)              |          
@@ -84,3 +86,11 @@ http://problemkaputt.de/psx-spx.htm#cpuspecifications
 ##### Memory Access
 
 ![Memory Access!](docs/images/Memory access.png "Memory Access")
+
+#### Shifter
+
+![Shifter!](docs/images/shifter.png "Shifter")
+
+#### Branch
+
+![Branch!](docs/images/branch.png "Branch")

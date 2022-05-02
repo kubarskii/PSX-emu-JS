@@ -71,4 +71,14 @@ describe("Instruction tests", () => {
 		expect(shamt).toBe(0x38);
 	});
 
+	it("should return instruction", () => {
+		const instruction = i(0x12345678);
+		expect(1 + +instruction).toBe(0x12345679);
+	});
+
+	it("should return instruction as hex string", () => {
+		const instruction = i(0x12345678);
+		expect(`${instruction}`).toBe("0x12345678");
+	});
+
 });

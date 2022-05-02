@@ -1,6 +1,6 @@
 import {isBios, writeBinaryToLocalStorage} from "../utils";
 import {UnsupportedDataTypeError} from "../errors/unsupported-data-type";
-import {BINARY_TYPES, BIOS_LEN} from "../utils/constants";
+import {BINARY_TYPES, BIOS_LEN, BIOS_POINTER} from "../utils/constants";
 import {memory} from "../memory";
 
 /**
@@ -32,9 +32,9 @@ export const loadFile = (file, onLoad, onErr) => {
 export const loadFileData = (buffer) => {
 	if (isBios(buffer)) {
 		writeBinaryToLocalStorage(BINARY_TYPES.BIOS, buffer);
-		const data = new Int32Array(buffer);
+		const bios = new Uint32Array(buffer);
 		for (let i = 0; i < BIOS_LEN; i += 4) {
-			memory[i >> 2] = data[i >> 2];
+			memory.memWrite(BIOS_POINTER + i, bios[i >> 2]);
 		}
 		return void 0;
 	}

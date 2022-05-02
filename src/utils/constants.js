@@ -6,12 +6,37 @@ export const BINARY_TYPES = {
 };
 
 /**
- * Max size of the MUST be 512K in length
- * hex:0x80000 === dec:512 * 1024
- * @var {number} biosLength - the default length of PSX BIOS in bytes
+ * Default length of PSX BIOS in bytes
+ * @type {number}
  * */
-export const BIOS_LEN = 0x80000;
+export const BIOS_LEN = 512 * 1024;
 
-export const DEFAULT_BIOS_PC = 0xbfc00000;
+/**
+ * Default length of PSX I/O Ports in bytes
+ * @var {number}
+ * */
+export const IO_LEN = 8 * 1024;
 
-export const DEFAULT_MASK = 0x01ffffff;
+/**
+ * Default length of Expansion 1 in bytes
+ * @var {number}
+ * */
+export const E1_LEN = 8192 * 1024;
+
+/**
+ * Default length of Expansion 2 in bytes
+ * @var {number}
+ * */
+export const E2_LEN = 8 * 1024;
+
+/**
+ * Default length of Expansion 3 in bytes
+ * @var {number}
+ * */
+export const E3_LEN = 2048 * 1024;
+
+export const BIOS_POINTER = 0xbfc00000;
+export const IO_POINTER = 0x1F801000;
+export const EXPANSION_1_POINTER = 0x1F000000;
+export const EXPANSION_2_POINTER = 0x1F802000;
+export const EXPANSION_3_POINTER = 0x1FA00000;

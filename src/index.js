@@ -3,13 +3,15 @@ import {readAndExecute} from "./utils";
 import {BINARY_TYPES} from "./utils/constants";
 import {BIOS} from "./bios/bios";
 import {CPU} from "./cpu/cpu";
-import {memory} from "./memory";
+import {initMemory, memory} from "./memory";
 
 const test_form = document.getElementById("test_form");
 
 const loadFileErrorCb = (e) => {
 	console.warn(e);
 };
+
+initMemory();
 
 /**
  * Loading file from form on submit
@@ -28,7 +30,10 @@ test_form.addEventListener("submit", function (e) {
  * @see BINARY_TYPES
  * */
 readAndExecute(BINARY_TYPES.BIOS, (buffer) => {
+	if (!buffer) return;
 	loadFileData(buffer);
 	const bios = new BIOS(new CPU(), memory);
 	bios.run();
 });
+
+

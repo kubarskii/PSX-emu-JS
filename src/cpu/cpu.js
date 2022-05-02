@@ -1,9 +1,16 @@
 import {CPUTypeError} from "../errors/type-error";
-import {ALU} from "./alu";
+import {ALU} from "./mips/alu";
 import {instruction} from "./instruction";
+import {MA} from "./mips/memory-access";
+import {stubFn} from "../utils";
+import {SHIFTER} from "./mips/shifter";
+import {BRANCH} from "./mips/branch";
 
 /**
- * @typedef {import('./alu.js').ALU} ALU
+ * @typedef {import('./mips/alu.js').ALU} ALU
+ * @typedef {import('./mips/memory-access.js').MA} MemoryAccess
+ * @typedef {import('./mips/shifter.js').SHIFTER} Shifter
+ * @typedef {import('./mips/branch.js').BRANCH} Branch
  */
 
 /**
@@ -24,8 +31,11 @@ export class CPU {
      * @type {Record<string, number>}
      * */
 	loopCtx = {
-		prevStamp: 0, timeToRender: 0,
+		prevStamp: 0,
+		timeToRender: 0,
 	};
+
+	_counter = 0;
 
 	_pc = 0x0;
 	_hi = 0x0;
@@ -36,10 +46,22 @@ export class CPU {
 	/**
      * @type {ALU}
      * */
-	alu = Object.keys(ALU).reduce((acc, curr) => {
-		acc[curr] = ALU[curr].bind(this);
-		return acc;
-	}, {});
+	alu = this.#bindInstructions(ALU);
+
+	/**
+     * @type {MemoryAccess}
+     * */
+	ma = this.#bindInstructions(MA);
+
+	/**
+     * @type {Shifter}
+     * */
+	shift = this.#bindInstructions(SHIFTER);
+
+	/**
+     * @type Branch
+     * */
+	branch = this.#bindInstructions(BRANCH);
 
 	/**
      * @type Registers
@@ -50,6 +72,16 @@ export class CPU {
 		if (CPU.instance) return this;
 		this.init();
 		CPU.instance = this;
+	}
+
+	/**
+     * @param {Record<string, (i: Instruction) => void>} obj
+     * */
+	#bindInstructions(obj) {
+		return Object.keys(obj).reduce((acc, curr) => {
+			acc[curr] = obj[curr].bind(this);
+			return acc;
+		}, {});
 	}
 
 	init() {
@@ -128,21 +160,164 @@ export class CPU {
      * @return {void}
      * */
 	execute(operation) {
-		if (typeof operation !== "string" && typeof operation !== "number") throw new CPUTypeError("Operation MUST be a number or string");
+		if (typeof operation !== "number")
+			throw new CPUTypeError("Operation MUST be a number or string");
 		const i = instruction(operation);
 		const opcode = i.opcode();
 		switch (opcode) {
-		case 0xf:
-			this.alu.LUI(i);
+		case 0x0:
+			switch (operation & 0x3f) {
+			case 0x0:
+				this.shift.SLL(i);
+				break;
+			case 0x2:
+				break;
+			case 0x3:
+				break;
+			case 0x4:
+				break;
+			case 0x6:
+				break;
+			case 0x7:
+				break;
+			case 0x8:
+				break;
+			case 0x9:
+				break;
+			case 0xc:
+				break;
+			case 0xd:
+				break;
+			case 0x10:
+				break;
+			case 0x11:
+				break;
+			case 0x12:
+				break;
+			case 0x13:
+				break;
+			case 0x18:
+				break;
+			case 0x19:
+				break;
+			case 0x1a:
+				break;
+			case 0x1b:
+				break;
+			case 0x20:
+				break;
+			case 0x21:
+				break;
+			case 0x22:
+				break;
+			case 0x23:
+				break;
+			case 0x24:
+				break;
+			case 0x25:
+				break;
+			case 0x26:
+				break;
+			case 0x27:
+				break;
+			case 0x2a:
+				break;
+			case 0x2b:
+				break;
+			default:
+				stubFn();
+			}
+			break;
+		case 0x1:
+			break;
+		case 0x2:
+			this.branch.J(i);
+			break;
+		case 0x3:
+			break;
+		case 0x4:
+			break;
+		case 0x5:
+			break;
+		case 0x6:
+			break;
+		case 0x7:
+			break;
+		case 0x8:
+			this.alu.ADDI(i);
+			break;
+		case 0x9:
+			this.alu.ADDIU(i);
+			break;
+		case 0xa:
+			break;
+		case 0xb:
+			break;
+		case 0xc:
+			this.alu.ANDI(i);
 			break;
 		case 0xd:
 			this.alu.ORI(i);
 			break;
+		case 0xe:
+			break;
+		case 0xf:
+			this.alu.LUI(i);
+			break;
+		case 0x10:
+			break;
+		case 0x11:
+			break;
+		case 0x12:
+			break;
+		case 0x13:
+			break;
+		case 0x20:
+			break;
+		case 0x21:
+			break;
+		case 0x22:
+			break;
+		case 0x23:
+			break;
+		case 0x24:
+			break;
+		case 0x25:
+			break;
+		case 0x26:
+			break;
+		case 0x28:
+			break;
+		case 0x29:
+			break;
+		case 0x2a:
+			break;
+		case 0x2b:
+			this.ma.SW(i);
+			break;
+		case 0x2e:
+			break;
+		case 0x30:
+			break;
+		case 0x31:
+			break;
+		case 0x32:
+			break;
+		case 0x33:
+			break;
+		case 0x38:
+			break;
+		case 0x39:
+			break;
+		case 0x3a:
+			break;
+		case 0x3b:
+			break;
 		default:
-			console.log(this.registers);
-			throw new Error("Instruction is not implemented!");
+			stubFn();
 		}
-		this.pc = this.pc + 1;
+		this.pc = this.pc + 4 >>> 0;
+		this._counter++;
 	}
 
 }

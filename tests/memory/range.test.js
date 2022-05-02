@@ -17,10 +17,25 @@ describe("Range and Mapping tests", () => {
 		const map = new Mapping();
 		const range = new Range(0xbfc00000, BIOS_LEN);
 		map.add(range);
-		map.memWrite(0xbfc00001, 0xf);
-		const v = map.memRead(0xbfc00001);
-		expect(range.data[1]).toBe(0xf);
+		map.memWrite(0xbfc00200, 0xf, true);
+		const v = map.memRead(0xbfc00200);
+		expect(range.data[128]).toBe(0xf);
 		expect(v).toBe(0xf);
+	});
+
+	it("should write to right range from mapping", () => {
+		const map = new Mapping();
+		const r1 = new Range(0xbfc00000, 8);
+		const r2 = new Range(0xbfc00200, 8);
+
+		map.add(r1);
+		map.add(r2);
+
+		map.memWrite(0xbfc00204, 0xf, true);
+		map.memWrite(0xbfc00000, 0xa, true);
+
+		expect(r2.data[1]).toBe(0xf);
+		expect(r1.data[0]).toBe(0xa);
 	});
 
 });
