@@ -77,6 +77,9 @@ http://problemkaputt.de/psx-spx.htm#cpuspecifications
 
 #### Opcodes
 
+The provided screenshots are valid for MIPS CPUs, 
+but there **may be differences** with the actual PSX CPU, so be careful
+
 ##### ALU
 
 ![ALU opcodes!](docs/images/ALU.png "ALU")
@@ -92,3 +95,7 @@ http://problemkaputt.de/psx-spx.htm#cpuspecifications
 #### Branch
 
 ![Branch!](docs/images/branch.png "Branch")
+
+#### Multiply
+
+![Multiply!](docs/images/multiply.png "Multiply")
