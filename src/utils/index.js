@@ -68,3 +68,17 @@ export const isBios = (buffer) => {
  * @return {undefined}
  * */
 export const stubFn = () => void 0;
+
+/**
+ * Accepts 16bits value and returns 32bits signed value
+ * @param {number} value
+ * @return {number}
+ * */
+export const getSigned16 = (value) => (value & 0xffff) >> 0;
+
+/**
+ * Accepts 16bits value and returns 32bits unsigned value
+ * @param {number} value
+ * @return {number}
+ * */
+export const getUnsigned16 = (value) => (0x00000000 | value) >> 0;

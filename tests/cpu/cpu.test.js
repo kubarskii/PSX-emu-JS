@@ -9,14 +9,14 @@ describe("CPU tests", () => {
 
 	it("should set register value by register ID", () => {
 		const cpu = new CPU();
-		cpu.setReg(0x1, 10);
-		expect(cpu.getReg(0x1)).toBe(10);
+		cpu.setRegV(0x1, 10);
+		expect(cpu.getRegV(0x1)).toBe(10);
 	});
 
 	it("should NOT update ZERO register", () => {
 		const cpu = new CPU();
-		cpu.setReg(0x0, 20);
-		expect(cpu.getReg(0x0)).toBe(0x0);
+		cpu.setRegV(0x0, 20);
+		expect(cpu.getRegV(0x0)).toBe(0x0);
 	});
 });
 
@@ -25,7 +25,7 @@ describe("ALU CPU tests", () => {
 		const cpu = new CPU();
 		const instruction = i(0x3c080f13);
 		cpu.alu.LUI(instruction);
-		expect(cpu.getReg(0x8)).toBe(0xf13 << 16);
+		expect(cpu.getRegV(0x8)).toBe(0xf13 << 16);
 	});
 
 	it("should run ALU ORI instruction", () => {
@@ -34,6 +34,6 @@ describe("ALU CPU tests", () => {
 		const instruction2 = i(0x3508243f);
 		cpu.alu.LUI(instruction);
 		cpu.alu.ORI(instruction2);
-		expect(cpu.getReg(0x8)).toBe(0x0013243f);
+		expect(cpu.getRegV(0x8)).toBe(0x0013243f);
 	});
 });

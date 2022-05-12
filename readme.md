@@ -22,8 +22,6 @@ If you want to commit to the repository, please run linter first and cover code 
 
 Memory map: https://psx-spx.consoledev.net/memorymap/
 
-fffe0130
-
 | KUSEG (Virtual) | KSEG0 (Physical Mirror with Cache) | KSEG1 (Physical) | Memory size | Type                                                |
 |-----------------|------------------------------------|------------------|-------------|-----------------------------------------------------|
 | 00000000h       | 80000000h                          | A0000000h        | 2048K       | Main RAM (first 64K reserved for BIOS)              |          
@@ -37,12 +35,12 @@ fffe0130
 
 | KSEG2     | Size |                                                |
 |-----------|------|------------------------------------------------|
-| FFFE0000h | 0.5K | Internal CPU control registers (Cache Control) |
+| FFFE0000h | 0.5K | Internal CPU control regs (Cache Control) |
 
 
 ### CPU Registers
 
-PSX uses 32bit wide registers, they are the following
+PSX uses 32bit wide regs, they are the following
 
 | Name    | Alias  | Common Usage                                                                                   |
 |---------|--------|------------------------------------------------------------------------------------------------|

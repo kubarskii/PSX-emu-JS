@@ -5,7 +5,7 @@ export const SHIFTER = {
 		const rt = i.rt();
 		const sa = i.shamt();
 
-		this.setReg(rd, this.getReg(rt) << sa);
+		this.setRegV(rd, this.getRegV(rt) << sa);
 	}
 
 };

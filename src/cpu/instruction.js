@@ -83,7 +83,7 @@ Instruction.prototype.funct = function () {
  * @return {number} - Immediate value
  * */
 Instruction.prototype.imm = function () {
-	return this.value & 0xffff;
+	return (this.value  << 16) >> 16;
 };
 
 /**
@@ -96,15 +96,13 @@ Instruction.prototype.address = function () {
 	return this.value & 0x3ffffff;
 };
 
-
 export function instruction(v) {
 	const fn = (v) => {
 		fn.value = v;
 		return fn;
 	};
 	const i = {
-		value: undefined,
-		type: undefined,
+		value: 0,
 		[Symbol.toPrimitive](hint) {
 			if (hint === "number") {
 				return this.value;

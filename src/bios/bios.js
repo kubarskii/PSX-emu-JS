@@ -1,4 +1,3 @@
-import {BIOS_POINTER} from "../utils/constants";
 import {memory} from "../memory";
 
 export class BIOS {
@@ -15,8 +14,6 @@ export class BIOS {
 	}
 
 	run() {
-		this.cpu.pc = BIOS_POINTER;
-
 		/**
          *  hook the Kernel after BIOS initialization
          *
@@ -24,10 +21,8 @@ export class BIOS {
          *  https://psx-spx.consoledev.net/expansionportpio/#mid-boot-hook
          * */
 		const BIOS_END = 0x80030000;
-		while (this.cpu.registers.pc !== BIOS_END) {
-			const pc = this.cpu.pc;
-			const operation = this.memory.memRead(pc);
-			this.cpu.execute(operation);
+		while (this.cpu.pc !== BIOS_END) {
+			this.cpu.execute();
 		}
 		console.log(memory, this.cpu.registers);
 	}

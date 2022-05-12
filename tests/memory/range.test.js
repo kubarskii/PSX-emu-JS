@@ -15,9 +15,9 @@ describe("Range and Mapping tests", () => {
 
 	it("should create mapping with range containing BIOS and write values", () => {
 		const map = new Mapping();
-		const range = new Range(0xbfc00000, BIOS_LEN);
+		const range = new Range(0x1fc00000, BIOS_LEN);
 		map.add(range);
-		map.memWrite(0xbfc00200, 0xf, true);
+		map.memWrite(0x1fc00200, 0xf, true);
 		const v = map.memRead(0xbfc00200);
 		expect(range.data[128]).toBe(0xf);
 		expect(v).toBe(0xf);
@@ -25,8 +25,8 @@ describe("Range and Mapping tests", () => {
 
 	it("should write to right range from mapping", () => {
 		const map = new Mapping();
-		const r1 = new Range(0xbfc00000, 8);
-		const r2 = new Range(0xbfc00200, 8);
+		const r1 = new Range(0x1fc00000, 8);
+		const r2 = new Range(0x1fc00200, 8);
 
 		map.add(r1);
 		map.add(r2);

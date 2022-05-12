@@ -1,29 +1,67 @@
 import {Mapping, Range} from "./range";
-import {
-	BIOS_LEN,
-	BIOS_POINTER,
-	E1_LEN,
-	E2_LEN,
-	E3_LEN,
-	EXPANSION_1_POINTER,
-	EXPANSION_2_POINTER,
-	EXPANSION_3_POINTER,
-	IO_LEN,
-	IO_POINTER
-} from "../utils/constants";
 
 export const memory = new Mapping();
 
 export const initMemory = () => {
-	const biosRange = new Range(BIOS_POINTER, BIOS_LEN);
-	const ioRange = new Range(IO_POINTER, IO_LEN);
-	const ex1 = new Range(EXPANSION_1_POINTER, E1_LEN);
-	const ex2 = new Range(EXPANSION_2_POINTER, E2_LEN);
-	const ex3 = new Range(EXPANSION_3_POINTER, E3_LEN);
+	/// Main RAM: 2MB mirrored four times over the first 8MB (probably
+	/// in case they decided to use a bigger RAM later on?)
+	const RAM = new Range(0x00000000, 8 * 1024 * 1024);
+	memory.add(RAM);
 
-	memory.add(biosRange);
-	memory.add(ioRange);
-	memory.add(ex1);
-	memory.add(ex2);
-	memory.add(ex3);
+	/// Expansion region 1
+	const EXPANSION_1 = new Range(0x1f000000, 512 * 1024);
+	memory.add(EXPANSION_1);
+
+	const BIOS = new Range(0x1fc00000, 512 * 1024);
+	memory.add(BIOS);
+
+	/// ScratchPad: data cache used as a fast 1kB RAM
+	const SCRATCH_PAD = new Range(0x1f800000, 1024);
+	memory.add(SCRATCH_PAD);
+
+	/// Memory latency and expansion mapping
+	const MEM_CONTROL = new Range(0x1f801000, 36);
+	memory.add(MEM_CONTROL);
+
+	/// Gamepad and memory card controller
+	const PAD_MEMCARD = new Range(0x1f801040, 32);
+	memory.add(PAD_MEMCARD);
+
+	/// Register that has something to do with RAM configuration,
+	/// configured by the BIOS
+	const RAM_SIZE = new Range(0x1f801060, 4);
+	memory.add(RAM_SIZE);
+
+	/// Interrupt Control regs (status and mask)
+	const IRQ_CONTROL = new Range(0x1f801070, 8);
+	memory.add(IRQ_CONTROL);
+
+	/// Direct Memory Access regs
+	const DMA = new Range(0x1f801080, 0x80);
+	memory.add(DMA);
+
+	const TIMERS = new Range(0x1f801100, 0x30);
+	memory.add(TIMERS);
+
+	/// CDROM controller
+	const CDROM = new Range(0x1f801800, 0x4);
+	memory.add(CDROM);
+
+	const GPU = new Range(0x1f801810, 8);
+	memory.add(GPU);
+
+	const MDEC = new Range(0x1f801820, 8);
+	memory.add(MDEC);
+
+	/// SPU regs
+	const SPU = new Range(0x1f801c00, 640);
+	memory.add(SPU);
+
+	/// Expansion region 2
+	const EXPANSION_2 = new Range(0x1f802000, 66);
+	memory.add(EXPANSION_2);
+
+	/// Cache control register. Full address since it's in KSEG2
+	const CACHE_CONTROL = new Range(0xfffe0130, 4);
+	memory.add(CACHE_CONTROL);
 };
