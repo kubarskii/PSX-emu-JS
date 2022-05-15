@@ -351,9 +351,7 @@ export class CPU {
 		case 0x1:
 			// BcondZ
 			break;
-		case 0x2:
-			this.branch.J(i);
-			break;
+		case 0x2: this.branch.J(i); break;
 		case 0x3:
 			//JAL
 			break;
@@ -417,6 +415,7 @@ export class CPU {
 			break;
 		case 0x23:
 			//LW
+			this.ma.LW(i);
 			break;
 		case 0x24:
 			//LBU

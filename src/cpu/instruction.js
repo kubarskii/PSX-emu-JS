@@ -17,7 +17,7 @@ Instruction.prototype.opcode = function () {
  * Works only for Immediate and Register formats (I, R)
  * 000000 00000 00000 00000 00000 000000
  *        ^^^^
- * Return bits [26:21]
+ * Return bits [26:21] - register source
  * */
 Instruction.prototype.rs = function () {
 	return (this.value) >> 21 & 0x1f;
@@ -38,7 +38,7 @@ Instruction.prototype.rt = function () {
  * Works only for Register format instruction (R)
  * 000000 00000 00000 00000 00000 000000
  *                    ^^^^
- * Return bits [16:11]
+ * Return bits [16:11] - register destination
  * */
 Instruction.prototype.rd = function () {
 	return (this.value >> 11) & 0x1f;

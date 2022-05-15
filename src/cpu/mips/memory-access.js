@@ -19,9 +19,9 @@ export const MA = {
 		const rs = i.rs();
 		const rt = i.rt();
 		const offset = i.imm();
-
-		console.log(rs, rt, offset);
-
+		const addr = this.getRegV(rs) + offset ;
+		const v = memory.memRead(addr) >> 0;
+		this.setRegV(rt, v);
 	},
 
 	// SB(i) {
