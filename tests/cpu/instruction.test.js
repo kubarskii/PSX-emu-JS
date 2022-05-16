@@ -40,8 +40,8 @@ describe("Instruction tests", () => {
 
 	it("should get register rs from instruction", () => {
 		const ins = i(0x12345678);
-		const ins2 = i(parseInt("00000011111000000000000000000000", 2));
-		const ins3 = i(parseInt("00110101000010000010010000111111", 2));
+		const ins2 = i(0b00000011111000000000000000000000);
+		const ins3 = i(0b00110101000010000010010000111111);
 		expect(ins.rs()).toBe(0x11);
 		expect(ins2.rs()).toBe(0x1f);
 		expect(ins3.rs()).toBe(0x8);
