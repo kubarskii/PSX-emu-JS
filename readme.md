@@ -86,7 +86,7 @@ but there **may be differences** with the actual PSX CPU, so be careful
 
 ##### Memory Access
 
-![Memory Access!](docs/images/Memory access.png "Memory Access")
+![Memory Access!](docs/images/ma.png "Memory Access")
 
 #### Shifter
 
