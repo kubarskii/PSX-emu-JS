@@ -2,7 +2,6 @@ import {CPUTypeError} from "../errors/type-error";
 import {ALU} from "./mips/alu";
 import {instruction} from "./instruction";
 import {MA} from "./mips/memory-access";
-import {stubFn} from "../utils";
 import {SHIFTER} from "./mips/shifter";
 import {BRANCH} from "./mips/branch";
 import {COP} from "./mips/cop";
@@ -60,13 +59,13 @@ export class CPU {
 	_sr = 0x0;
 
 	/**
-	 *
-	 * */
+     *
+     * */
 	_cause = 0x0;
 
 	/**
-	 *
-	 * */
+     *
+     * */
 	_epc = 0x0;
 
 	/**
@@ -108,9 +107,9 @@ export class CPU {
 	regs = new Int32Array(32);
 
 	/**
-	 * Output registers
-	 * @type Registers
-	 * */
+     * Output registers
+     * @type Registers
+     * */
 	out_regs = new Int32Array(32);
 
 	constructor() {
@@ -143,57 +142,57 @@ export class CPU {
 	}
 
 	/**
-	 * @return {number} - u32
-	 * */
+     * @return {number} - u32
+     * */
 	get pc() {
 		return this._pc >>> 0;
 	}
 
 	/**
-	 * @param {number} value - u32
-	 * */
+     * @param {number} value - u32
+     * */
 	set sr(value) {
 		this._sr = value;
 	}
 
 	/**
-	 * @param {number} value - u32
-	 * */
+     * @param {number} value - u32
+     * */
 	set hi(value) {
 		this._hi = value;
 	}
 
 	/**
-	 * @param {number} value - u32
-	 * */
+     * @param {number} value - u32
+     * */
 	set cause(value) {
 		this._cause = value;
 	}
 
 	/**
-	 * @param {number} value - u32
-	 * */
+     * @param {number} value - u32
+     * */
 	set epc(value) {
 		this._epc = value;
 	}
 
 	/**
-	 * @param {number} value - u32
-	 * */
+     * @param {number} value - u32
+     * */
 	set lo(value) {
 		this._lo = value;
 	}
 
 	/**
-	 * @param {number} value - u32
-	 * */
+     * @param {number} value - u32
+     * */
 	set nextPc(value) {
 		this._nextPc = value;
 	}
 
 	/**
-	 * @param {number} value - u32
-	 * */
+     * @param {number} value - u32
+     * */
 	set currentPc(value) {
 		this._currentPc = value;
 	}
@@ -251,7 +250,7 @@ export class CPU {
 		return this[_isRunning];
 	}
 
-	fetchInstruction(pc){
+	fetchInstruction(pc) {
 		const code = memory.memRead(pc);
 		return instruction(code);
 	}
@@ -261,6 +260,7 @@ export class CPU {
      * @return {void}
      * */
 	execute() {
+
 		if (this.pc % 4 !== 0x0) {
 			throw new Error("PC is not correctly aligned!");
 		}
@@ -272,201 +272,99 @@ export class CPU {
 		this._nextPc = (this.pc + 4) >>> 0;
 
 		const opcode = i.opcode();
-		switch (opcode) {
-		case 0x0:
-			switch (i.funct()) {
-			case 0x0:
-				console.log(`${this._currentPc.toString(16)} nop`);
-				this.shift.SLL(i);
-				break;
-			case 0x2:
-				break;
-			case 0x3:
-				break;
-			case 0x4:
-				break;
-			case 0x6:
-				break;
-			case 0x7:
-				break;
-			case 0x8:
-				break;
-			case 0x9:
-				break;
-			case 0xc:
-				break;
-			case 0xd:
-				break;
-			case 0x10:
-				break;
-			case 0x11:
-				break;
-			case 0x12:
-				break;
-			case 0x13:
-				break;
-			case 0x18:
-				break;
-			case 0x19:
-				break;
-			case 0x1a:
-				break;
-			case 0x1b:
-				break;
-			case 0x20:
-				this.alu.ADD(i);
-				break;
-			case 0x21:
-				this.alu.ADDU(i);
-				break;
-			case 0x22:
-				this.alu.SUB(i);
-				break;
-			case 0x23:
-				this.alu.SUBU(i);
-				break;
-			case 0x24:
-				this.alu.AND(i);
-				break;
-			case 0x25:
-				this.alu.OR(i);
-				break;
-			case 0x26:
-				this.alu.XOR(i);
-				break;
-			case 0x27:
-				this.alu.NOR(i);
-				break;
-			case 0x2a:
-				this.alu.SLT(i);
-				break;
-			case 0x2b:
-				this.alu.SLTU(i);
-				break;
-			default:
-				console.log(`${this._currentPc.toString(16)} nop`);
-				stubFn();
-			}
-			break;
-		case 0x1:
-			// BcondZ
-			break;
-		case 0x2: this.branch.J(i); break;
-		case 0x3:
-			//JAL
-			break;
-		case 0x4:
-			//BEQ
-			break;
-		case 0x5:
-			//BNE
-			this.branch.BNE(i);
-			break;
-		case 0x6:
-			//BLEZ
-			break;
-		case 0x7:
-			//BGTZ
-			break;
-		case 0x8:
-			this.alu.ADDI(i);
-			break;
-		case 0x9:
-			this.alu.ADDIU(i);
-			break;
-		case 0xa:
-			//SLTI
-			break;
-		case 0xb:
-			//SLTIU
-			break;
-		case 0xc:
-			this.alu.ANDI(i);
-			break;
-		case 0xd:
-			this.alu.ORI(i);
-			break;
-		case 0xe:
-			this.alu.XORI(i);
-			break;
-		case 0xf:
-			this.alu.LUI(i);
-			break;
-		case 0x10:
-			this.coprocessor.MTC0(i);
-			break;
-		case 0x11:
-			//COP1
-			break;
-		case 0x12:
-			//COP2
-			break;
-		case 0x13:
-			//COP3
-			break;
-		case 0x20:
-			//LB
-			break;
-		case 0x21:
-			//LH
-			break;
-		case 0x22:
-			//LWL
-			break;
-		case 0x23:
-			//LW
-			this.ma.LW(i);
-			break;
-		case 0x24:
-			//LBU
-			break;
-		case 0x25:
-			//LHU
-			break;
-		case 0x26:
-			//LWR
-			break;
-		case 0x28:
-			//SB
-			break;
-		case 0x29:
-			//SH
-			break;
-		case 0x2a:
-			//SWL
-			break;
-		case 0x2b:
-			this.ma.SW(i);
-			break;
-		case 0x2e:
-			//SWR
-			break;
-		case 0x30:
-			//LWC0
-			break;
-		case 0x31:
-			//LWC1
-			break;
-		case 0x32:
-			//LWC2
-			break;
-		case 0x33:
-			//LWC3
-			break;
-		case 0x38:
-			//SWC0
-			break;
-		case 0x39:
-			break;
-		case 0x3a:
-			break;
-		case 0x3b:
-			break;
-		default:
-			console.log(`${this._currentPc.toString(16)} nop`);
-			stubFn();
+
+		const ops = {
+			0b000000: () => this.executeSubFunction(i),
+			0b001111: () => this.alu.LUI(i),
+			0b001101: () => this.alu.ORI(i),
+			0b101011: () => this.ma.SW(i),
+			0b001001: () => this.alu.ADDIU(i),
+			0b010000: () => this.executeCop0(i),
+			0b000010: () => this.branch.J(i),
+			0b000101: () => this.branch.BNE(i),
+			0b001000: () => this.alu.ADDI(i),
+			0b100011: () => this.ma.LW(i),
+			0b101001: "Box::new (Sh::new (instruction))",
+			0b000011: "Box::new (Jal::new (instruction))",
+			0b001100: "Box::new (Andi::new (instruction))",
+			0b101000: "Box::new (Sb::new (instruction))",
+			0b100000: "Box::new (Lb::new (instruction))",
+			0b000100: "Box::new (Beq::new (instruction))",
+			0b000111: "Box::new (Bqtz::new (instruction))",
+			0b000110: "Box::new (Bltz::new (instruction))",
+			0b100100: "Box::new (Lbu::new (instruction))",
+			0b000001: "Box::new (Bxx::new (instruction))",
+			0b001010: "Box::new (Slti::new (instruction))",
+			0b001011: "Box::new (Sltiu::new (instruction))",
+			0b100101: "Box::new (Lhu::new (instruction))",
+			0b100001: "Box::new (Lh::new (instruction))",
+			0b100010: "Box::new (Lwl::new (instruction))",
+			0b100110: "Box::new (Lwr::new (instruction))",
+			0b101010: "Box::new (Swl::new (instruction))",
+			0b101110: "Box::new (Swr::new (instruction))",
+		};
+
+		if (ops[opcode] && typeof ops[opcode] === "function") {
+			ops[opcode]();
+		} else {
+			console.log("Unknown opcode!");
 		}
 		this._counter++;
 	}
+
+	executeCop0(i) {
+		const opcode = i.copOpcode();
+		const ops = {
+			0b000100: () => this.coprocessor.MTC0(i),
+			0b000000: "Box::new(Mfc0::new(instruction))",
+			0b010000: "Box::new(Rfe::new(instruction))",
+		};
+
+		if (ops[opcode] && typeof ops[opcode] === "function") {
+			ops[opcode]();
+		} else {
+			console.log("Unknown COP0 opcode!");
+		}
+
+	}
+
+	executeSubFunction(i) {
+		const opcode = i.funct();
+
+		const ops = {
+			0b000000: () => this.shift.SLL(i),
+			0b100101: () => this.alu.OR(i),
+			0b100111: () => this.alu.NOR(i),
+			0b101011: () => this.alu.SLTU(i),
+			0b100001: () => this.alu.ADDU(i),
+			0b001000: "Box::new(Jr::new(instruction))",
+			0b100100: () => this.alu.AND(i),
+			0b100000: () => this.alu.ADD(i),
+			0b001001: "Box::new(Jarl::new(instruction))",
+			0b100011: "Box::new(Subu::new(instruction))",
+			0b000011: "Box::new(Sra::new(instruction))",
+			0b011010: "Box::new(Div::new(instruction))",
+			0b010010: "Box::new(Mflo::new(instruction))",
+			0b010000: "Box::new(Mfhi::new(instruction))",
+			0b000010: "Box::new(Srl::new(instruction))",
+			0b011011: "Box::new(Divu::new(instruction))",
+			0b101010: "Box::new(Slt::new(instruction))",
+			0b001100: "Box::new(Syscall::new())",
+			0b010011: "Box::new(Mtlo::new(instruction))",
+			0b010001: "Box::new(Mthi::new(instruction))",
+			0b000100: "Box::new(Sllv::new(instruction))",
+			0b100110: () => this.alu.XOR(i),
+			0b011001: "Box::new(Multu::new(instruction))",
+			0b000110: "Box::new(Srlv::new(instruction))",
+			0b100010: "Box::new(Sub::new(instruction))",
+		};
+
+		if (ops[opcode] && typeof ops[opcode] === "function") {
+			ops[opcode](i);
+		} else {
+			console.log("Unknown sub-function opcode!");
+		}
+	}
+
 
 }

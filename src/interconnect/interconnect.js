@@ -1,14 +1,17 @@
 /**
- * TODO: replace memory with Interconnect???
- * Used as a bus (connection between BIOS, RAM ....)
+ * Used as a bus (connection between BIOS, RAM, GPU ....)
  * Should wrap the memory
  */
 export class Interconnect {
 
 	bios = null;
+	ram = null;
+	gpu = null;
 
-	constructor(bios) {
+	constructor(bios, ram, gpu) {
 		this.bios = bios;
+		this.ram = ram;
+		this.gpu = gpu;
 	}
 
 	/**

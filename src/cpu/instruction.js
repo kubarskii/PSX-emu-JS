@@ -83,7 +83,7 @@ Instruction.prototype.funct = function () {
  * @return {number} - Immediate value
  * */
 Instruction.prototype.imm = function () {
-	return (this.value  << 16) >> 16;
+	return (this.value << 16) >> 16;
 };
 
 /**
@@ -96,6 +96,17 @@ Instruction.prototype.address = function () {
 	return this.value & 0x3ffffff;
 };
 
+/**
+ *  Return coprocessor opcode in bits [25:21]
+ */
+Instruction.prototype.copOpcode = function () {
+	return (this.value >> 21) & 0x1f;
+};
+
+/**
+ * Instruction functional object
+ * @param {number} v - instruction code
+ * */
 export function instruction(v) {
 	const fn = (v) => {
 		fn.value = v;
