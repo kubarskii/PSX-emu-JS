@@ -54,12 +54,12 @@ export class CPU {
 	_lo = 0xdeadbeef;
 
 	/**
-     * Status register for coprocessor
+     * COP0 Status register for coprocessor
      * */
 	_sr = 0x0;
 
 	/**
-     *
+     * COP0 register, contains cause of exception
      * */
 	_cause = 0x0;
 
@@ -110,7 +110,7 @@ export class CPU {
      * Output registers
      * @type Registers
      * */
-	out_regs = new Int32Array(32);
+	outRegs = new Int32Array(32);
 
 	constructor() {
 		if (CPU.instance) return this;
@@ -155,11 +155,19 @@ export class CPU {
 		this._sr = value;
 	}
 
+	get sr() {
+		return this._sr;
+	}
+
 	/**
      * @param {number} value - u32
      * */
 	set hi(value) {
 		this._hi = value;
+	}
+
+	get hi(){
+		return this._hi;
 	}
 
 	/**
@@ -284,9 +292,9 @@ export class CPU {
 			0b000101: () => this.branch.BNE(i),
 			0b001000: () => this.alu.ADDI(i),
 			0b100011: () => this.ma.LW(i),
-			0b101001: "Box::new (Sh::new (instruction))",
-			0b000011: "Box::new (Jal::new (instruction))",
-			0b001100: "Box::new (Andi::new (instruction))",
+			0b101001: () => this.ma.SH(i),
+			0b000011: () => this.branch.JAL(i),
+			0b001100: () => this.alu.ANDI(i),
 			0b101000: "Box::new (Sb::new (instruction))",
 			0b100000: "Box::new (Lb::new (instruction))",
 			0b000100: "Box::new (Beq::new (instruction))",
@@ -294,8 +302,8 @@ export class CPU {
 			0b000110: "Box::new (Bltz::new (instruction))",
 			0b100100: "Box::new (Lbu::new (instruction))",
 			0b000001: "Box::new (Bxx::new (instruction))",
-			0b001010: "Box::new (Slti::new (instruction))",
-			0b001011: "Box::new (Sltiu::new (instruction))",
+			0b001010: () => this.alu.SLTI(i),
+			0b001011: () => this.alu.SLTIU(i),
 			0b100101: "Box::new (Lhu::new (instruction))",
 			0b100001: "Box::new (Lh::new (instruction))",
 			0b100010: "Box::new (Lwl::new (instruction))",
@@ -341,7 +349,7 @@ export class CPU {
 			0b100100: () => this.alu.AND(i),
 			0b100000: () => this.alu.ADD(i),
 			0b001001: "Box::new(Jarl::new(instruction))",
-			0b100011: "Box::new(Subu::new(instruction))",
+			0b100011: () => this.alu.SUBU(i),
 			0b000011: "Box::new(Sra::new(instruction))",
 			0b011010: "Box::new(Div::new(instruction))",
 			0b010010: "Box::new(Mflo::new(instruction))",
@@ -356,7 +364,7 @@ export class CPU {
 			0b100110: () => this.alu.XOR(i),
 			0b011001: "Box::new(Multu::new(instruction))",
 			0b000110: "Box::new(Srlv::new(instruction))",
-			0b100010: "Box::new(Sub::new(instruction))",
+			0b100010: () => this.alu.SUB(i),
 		};
 
 		if (ops[opcode] && typeof ops[opcode] === "function") {

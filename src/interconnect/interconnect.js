@@ -18,7 +18,8 @@ export class Interconnect {
      * loads value by address
      * @param {number} addr
      * */
-	load() {
+	load(addr) {
+		console.log(addr);
 	}
 
 	/**
@@ -26,8 +27,8 @@ export class Interconnect {
      * @param {number} addr
      * @param {number} value
      * */
-	store() {
-
+	store(addr, value) {
+		console.log(addr, value);
 	}
 
 }

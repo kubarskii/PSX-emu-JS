@@ -53,7 +53,7 @@ export const initMemory = () => {
 	const MDEC = new Range(0x1f801820, 8);
 	memory.add(MDEC);
 
-	/// SPU regs
+	/// SPU (Sound Processing Unit) regs
 	const SPU = new Range(0x1f801c00, 640);
 	memory.add(SPU);
 

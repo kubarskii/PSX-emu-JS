@@ -15,11 +15,11 @@ export const MA = {
 		memory.memWrite(addr, this.getRegV(rt));
 	},
 
-	LW(i){
+	LW(i) {
 		const rs = i.rs();
 		const rt = i.rt();
 		const offset = i.imm();
-		const addr = this.getRegV(rs) + offset ;
+		const addr = this.getRegV(rs) + offset;
 		const v = memory.memRead(addr) >> 0;
 		this.setRegV(rt, v);
 	},
@@ -28,8 +28,30 @@ export const MA = {
 	//
 	// },
 
-	// SH(i) {
-	//
-	// }
+	/**
+     * Store HALF WORD - 16 bit instead of 32
+     * */
+	SH(i) {
+		if (this.sr & 0x10000 !== 0) {
+			/**
+             * Cache is isolated , ignore write
+             * */
+			console.warn("Ignoring store while cache is isolated");
+			return;
+		}
+
+		let imm = i.imm();
+		let rt = i.rt();
+		let rs = i.rs();
+
+		let addr = this.getRegV(rs) + imm;
+
+		if (addr % 2 === 0) {
+			let v = this.getRegV(rt);
+			memory.memWrite(addr, v);
+		} else {
+			throw new Error("StoreAddressError");
+		}
+	}
 };
 
