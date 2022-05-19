@@ -1,3 +1,5 @@
+import {getSigned16} from "../../utils";
+
 export const ALU = {
 
 	ADD(i) {
@@ -18,7 +20,7 @@ export const ALU = {
 	ADDIU(i) {
 		const rt = i.rt();
 		const rs = i.rs();
-		const imm = i.imm();
+		const imm = getSigned16(i.imm() >>> 0);
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: addiu  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, (this.getRegV(rs) + imm) >>> 0);
 	},
@@ -27,6 +29,7 @@ export const ALU = {
 		const rd = i.rd();
 		const rs = i.rs();
 		const rt = i.rt();
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: addu  r${rd}, r${rt}, r${rs}`);
 		this.setRegV(rd, (this.getRegV(rs) + this.getRegV(rt)) >>> 0);
 	},
 
@@ -69,7 +72,7 @@ export const ALU = {
 	ORI(i) {
 		const rt = i.rt();
 		const rs = i.rs();
-		const imm = i.imm();
+		const imm = getSigned16(i.imm() >>> 0);
 		const rsValue = this.getRegV(rs);
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: ori    r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, rsValue | imm);

@@ -102,17 +102,16 @@ export class Mapping {
 
 
 	/**
+	 * WARNING!!! Unaligned memory access should be checked before fn call
      * @param {number} index address where to store data
      * @param {number} data data to be stored
-     * @param {boolean} force use force property to allow unaligned memory access by force, can be helpful in tests
      * @return {void}
      * */
-	memWrite(index, data, force = false) {
-		const addr = this.maskRegion(index);
-
-		if (!force && (addr >>> 0) % 4 !== 0) {
-			throw new Error(`Unaligned memWrite address: 0x${addr.toString(16)}`);
-		}
+	memWrite(index, data) {
+		const addr = this.maskRegion(index) >>> 0;
+		/**
+		 * Unaligned memory access moved to instructions
+		 * */
 
 		for (let i = 0; i < this.data.length; i++) {
 			const r = this.data[i];
@@ -130,10 +129,6 @@ export class Mapping {
      * */
 	memRead(index) {
 		const addr = this.maskRegion(index);
-
-		if ((addr >>> 0) % 4 !== 0) {
-			throw new Error(`Unaligned memRead address: 0x${addr.toString(16)}`);
-		}
 
 		for (let i = 0; i < this.data.length; i++) {
 			const r = this.data[i];

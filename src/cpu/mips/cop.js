@@ -15,13 +15,14 @@ export const COP = {
 			9: () => stubFn(),
 			11: () => stubFn(),
 			12: () => {
+				console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: mtc0  r${rt}, r${rd}, $${rtValue.toString(16).padStart(4, 0)}`);
 				this._sr = rtValue;
 			},
 			13: () => {
 				if (rtValue !== 0) {
 					throw new Error("Unhandled write to CAUSE register");
 				}
-				console.log(`CAUSE: mtc0, rd: ${rd}, ${rtValue}`);
+				console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: mtc0  r${rt}, r${rd}, $${rtValue.toString(16).padStart(4, 0)}`);
 			},
 		};
 

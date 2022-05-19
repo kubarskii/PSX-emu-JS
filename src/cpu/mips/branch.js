@@ -17,6 +17,7 @@ export const BRANCH = {
 	},
 
 	JAL(i){
+		console.log("jal");
 		this.branch.J(i);
 		this.setRegV(31, this._nextPc);
 	},

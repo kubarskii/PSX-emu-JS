@@ -268,6 +268,7 @@ export class CPU {
      * @return {void}
      * */
 	execute() {
+		// debugger;
 
 		if (this.pc % 4 !== 0x0) {
 			throw new Error("PC is not correctly aligned!");
@@ -295,7 +296,7 @@ export class CPU {
 			0b101001: () => this.ma.SH(i),
 			0b000011: () => this.branch.JAL(i),
 			0b001100: () => this.alu.ANDI(i),
-			0b101000: "Box::new (Sb::new (instruction))",
+			0b101000: () => this.ma.SB(i),
 			0b100000: "Box::new (Lb::new (instruction))",
 			0b000100: "Box::new (Beq::new (instruction))",
 			0b000111: "Box::new (Bqtz::new (instruction))",
