@@ -1,8 +1,8 @@
 import {getSigned16} from "../../utils";
-
+import {memory} from "../../memory";
 export const ALU = {
-
 	ADD(i) {
+		memory.memRead(0);
 		const rd = i.rd();
 		const rs = i.rd();
 		const rt = i.rd();
@@ -12,7 +12,7 @@ export const ALU = {
 	ADDI(i) {
 		const rt = i.rs();
 		const rs = i.rs();
-		const imm = i.imm();
+		const imm = getSigned16(i.imm());
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: addi  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, (this.getRegV(rs) + imm) >>> 0);
 	},
@@ -20,7 +20,7 @@ export const ALU = {
 	ADDIU(i) {
 		const rt = i.rt();
 		const rs = i.rs();
-		const imm = getSigned16(i.imm() >>> 0);
+		const imm = i.imm() >>> 0;
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: addiu  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, (this.getRegV(rs) + imm) >>> 0);
 	},
@@ -30,13 +30,15 @@ export const ALU = {
 		const rs = i.rs();
 		const rt = i.rt();
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: addu  r${rd}, r${rt}, r${rs}`);
-		this.setRegV(rd, (this.getRegV(rs) + this.getRegV(rt)) >>> 0);
+		this.setRegV(rd, (this.getRegV(rs) + (this.getRegV(rt) >>> 0)) >>> 0);
 	},
 
 	AND(i) {
 		const rd = i.rd();
 		const rs = i.rs();
 		const rt = i.rt();
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: and  r${rd}, r${rt}, r${rs}`);
+
 		this.setRegV(rd, this.getRegV(rs) & this.getRegV(rt));
 	},
 
@@ -44,6 +46,7 @@ export const ALU = {
 		const rt = i.rt();
 		const rs = i.rs();
 		const imm = i.imm();
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: andi  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, this.getRegV(rs) & imm);
 	},
 
@@ -58,6 +61,8 @@ export const ALU = {
 		const rd = i.rd();
 		const rs = i.rs();
 		const rt = i.rt();
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: nor     r${rd}, r${rt}, r${rs}`);
+
 		this.setRegV(rd, ~(this.getRegV(rs) | this.getRegV(rt)));
 	},
 
@@ -82,6 +87,8 @@ export const ALU = {
 		const rt = i.rt();
 		const rs = i.rs();
 		const rd = i.rd();
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: slt     r${rd}, r${rt}, r${rs}`);
+
 		this.setRegV(rd, this.getRegV(rs) < this.getRegV(rt));
 	},
 
@@ -89,6 +96,8 @@ export const ALU = {
 		const rt = i.rt();
 		const rs = i.rs();
 		const imm = i.imm();
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: slti    r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
+
 		this.setRegV(rt, this.getRegV(rs) < imm);
 	},
 
@@ -96,14 +105,16 @@ export const ALU = {
 		const rt = i.rt();
 		const rs = i.rs();
 		const imm = i.imm();
-		this.setRegV(rt, this.getRegV(rs) < imm);
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: sltiu   r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
+		this.setRegV(rt, (this.getRegV(rs) >>> 0) < imm);
 	},
 
 	SLTU(i) {
 		const rd = i.rd();
 		const rs = i.rs();
 		const rt = i.rt();
-		this.setRegV(rd, this.getRegV(rs) < this.getRegV(rt));
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: sltu     r${rd}, r${rt}, r${rs}`);
+		this.setRegV(rd, (this.getRegV(rs) >>> 0) < (this.getRegV(rt) >>> 0));
 	},
 
 	SUB(i) {

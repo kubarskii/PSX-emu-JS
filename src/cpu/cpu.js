@@ -166,7 +166,7 @@ export class CPU {
 		this._hi = value;
 	}
 
-	get hi(){
+	get hi() {
 		return this._hi;
 	}
 
@@ -268,7 +268,6 @@ export class CPU {
      * @return {void}
      * */
 	execute() {
-		// debugger;
 
 		if (this.pc % 4 !== 0x0) {
 			throw new Error("PC is not correctly aligned!");
@@ -297,9 +296,9 @@ export class CPU {
 			0b000011: () => this.branch.JAL(i),
 			0b001100: () => this.alu.ANDI(i),
 			0b101000: () => this.ma.SB(i),
-			0b100000: "Box::new (Lb::new (instruction))",
-			0b000100: "Box::new (Beq::new (instruction))",
-			0b000111: "Box::new (Bqtz::new (instruction))",
+			0b100000: () => this.ma.LB(i),
+			0b000100: () => this.branch.BEQ(i),
+			0b000111: () => this.branch.BGTZ(i),
 			0b000110: "Box::new (Bltz::new (instruction))",
 			0b100100: "Box::new (Lbu::new (instruction))",
 			0b000001: "Box::new (Bxx::new (instruction))",
@@ -316,7 +315,7 @@ export class CPU {
 		if (ops[opcode] && typeof ops[opcode] === "function") {
 			ops[opcode]();
 		} else {
-			console.log("Unknown opcode!");
+			console.log("nop, Unknown opcode!");
 		}
 		this._counter++;
 	}
@@ -325,14 +324,14 @@ export class CPU {
 		const opcode = i.copOpcode();
 		const ops = {
 			0b000100: () => this.coprocessor.MTC0(i),
-			0b000000: "Box::new(Mfc0::new(instruction))",
+			0b000000: () => this.coprocessor.MFC0(i),
 			0b010000: "Box::new(Rfe::new(instruction))",
 		};
 
 		if (ops[opcode] && typeof ops[opcode] === "function") {
 			ops[opcode]();
 		} else {
-			console.log("Unknown COP0 opcode!");
+			console.log("nop, Unknown COP0 opcode!");
 		}
 
 	}
@@ -346,10 +345,10 @@ export class CPU {
 			0b100111: () => this.alu.NOR(i),
 			0b101011: () => this.alu.SLTU(i),
 			0b100001: () => this.alu.ADDU(i),
-			0b001000: "Box::new(Jr::new(instruction))",
+			0b001000: () => this.branch.JR(i),
 			0b100100: () => this.alu.AND(i),
 			0b100000: () => this.alu.ADD(i),
-			0b001001: "Box::new(Jarl::new(instruction))",
+			0b001001: () => this.branch.JALR(i),
 			0b100011: () => this.alu.SUBU(i),
 			0b000011: "Box::new(Sra::new(instruction))",
 			0b011010: "Box::new(Div::new(instruction))",
@@ -357,7 +356,7 @@ export class CPU {
 			0b010000: "Box::new(Mfhi::new(instruction))",
 			0b000010: "Box::new(Srl::new(instruction))",
 			0b011011: "Box::new(Divu::new(instruction))",
-			0b101010: "Box::new(Slt::new(instruction))",
+			0b101010: () => this.alu.SLT(i),
 			0b001100: "Box::new(Syscall::new())",
 			0b010011: "Box::new(Mtlo::new(instruction))",
 			0b010001: "Box::new(Mthi::new(instruction))",
@@ -371,7 +370,7 @@ export class CPU {
 		if (ops[opcode] && typeof ops[opcode] === "function") {
 			ops[opcode](i);
 		} else {
-			console.log("Unknown sub-function opcode!");
+			console.log("nop, Unknown sub-function opcode!");
 		}
 	}
 

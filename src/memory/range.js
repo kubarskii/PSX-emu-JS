@@ -10,16 +10,24 @@ export const REGION_MASK = [
 ];
 
 export class Range {
+
 	data;
 	initialAddress;
 	size;
+	/**
+	 * Optional, contains the name of memory Range
+	 * @type string
+	 * */
+	name;
 
 	/**
      * @param {number} initialAddress - initial address
      * @param {number} size - of range in bytes
+	 * @param {string} name - OPTIONAL name of range
      * */
-	constructor(initialAddress, size) {
-		this.data = new Uint32Array(size >>> 2);
+	constructor(initialAddress, size, name = "") {
+		this.name = name;
+		this.data = new Uint32Array(new Uint8Array(size));
 		this.initialAddress = initialAddress;
 		this.size = size;
 	}
@@ -41,7 +49,6 @@ export class Range {
 	has(index) {
 		const i = (this.initialAddress | ((index ^ this.initialAddress) >> 2)) >>> 0;
 		return i >= this.initialAddress && i - this.initialAddress <= this.size;
-
 	}
 
 	/**
@@ -108,10 +115,7 @@ export class Mapping {
      * @return {void}
      * */
 	memWrite(index, data) {
-		const addr = this.maskRegion(index) >>> 0;
-		/**
-		 * Unaligned memory access moved to instructions
-		 * */
+		const addr = this.maskRegion(index >>> 0) >>> 0;
 
 		for (let i = 0; i < this.data.length; i++) {
 			const r = this.data[i];
@@ -129,7 +133,6 @@ export class Mapping {
      * */
 	memRead(index) {
 		const addr = this.maskRegion(index);
-
 		for (let i = 0; i < this.data.length; i++) {
 			const r = this.data[i];
 			if (r.has(addr)) {

@@ -1,5 +1,6 @@
 import {Mapping, Range} from "../../src/memory/range";
 import {BIOS_LEN} from "../../src/utils/constants";
+import {initMemory, memory} from "../../src/memory";
 
 describe("Range and Mapping tests", () => {
 
@@ -36,6 +37,12 @@ describe("Range and Mapping tests", () => {
 
 		expect(r2.data[1]).toBe(0xf);
 		expect(r1.data[0]).toBe(0xa);
+	});
+
+	it("should write value to memory", () => {
+		initMemory();
+		memory.memWrite(0x1f801060 >>> 0, 10);
+		expect(memory.memRead(0x1f801060)).toBe(10);
 	});
 
 });

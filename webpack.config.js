@@ -26,7 +26,7 @@ const config = {
             directory: path.join(__dirname, "public"),
         },
         compress: true,
-        port: 9001,
+        port: 9002,
     },
     module: {
         rules: [

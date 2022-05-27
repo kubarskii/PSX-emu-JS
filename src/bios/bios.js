@@ -21,10 +21,10 @@ export class BIOS {
          *  https://psx-spx.consoledev.net/expansionportpio/#mid-boot-hook
          * */
 		const BIOS_END = 0x80030000;
-		while (this.cpu.pc !== BIOS_END) {
+		while ((this.cpu.pc | 0) !== (BIOS_END | 0)) {
 			this.cpu.execute();
 		}
-		console.log(memory, this.cpu.registers);
+		console.log(memory, this.cpu.regs);
 	}
 }
 

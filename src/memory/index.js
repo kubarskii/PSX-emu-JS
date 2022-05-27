@@ -5,35 +5,35 @@ export const memory = new Mapping();
 export const initMemory = () => {
 	/// Main RAM: 2MB mirrored four times over the first 8MB (probably
 	/// in case they decided to use a bigger RAM later on?)
-	const RAM = new Range(0x00000000, 8 * 1024 * 1024);
+	const RAM = new Range(0x00000000, 8 * 1024 * 1024, "RAM");
 	memory.add(RAM);
 
 	/// Expansion region 1
-	const EXPANSION_1 = new Range(0x1f000000, 512 * 1024);
+	const EXPANSION_1 = new Range(0x1f000000, 512 * 1024, "EXPANSION 1");
 	memory.add(EXPANSION_1);
 
-	const BIOS = new Range(0x1fc00000, 512 * 1024);
+	const BIOS = new Range(0x1fc00000, 512 * 1024, "BIOS");
 	memory.add(BIOS);
 
 	/// ScratchPad: data cache used as a fast 1kB RAM
-	const SCRATCH_PAD = new Range(0x1f800000, 1024);
+	const SCRATCH_PAD = new Range(0x1f800000, 1024, "SCRATCH PAD");
 	memory.add(SCRATCH_PAD);
 
 	/// Memory latency and expansion mapping
-	const MEM_CONTROL = new Range(0x1f801000, 36);
+	const MEM_CONTROL = new Range(0x1f801000, 36, "MEM CONTROL");
 	memory.add(MEM_CONTROL);
 
 	/// Gamepad and memory card controller
-	const PAD_MEMCARD = new Range(0x1f801040, 32);
+	const PAD_MEMCARD = new Range(0x1f801040, 32, "PAD MEMCARD");
 	memory.add(PAD_MEMCARD);
 
 	/// Register that has something to do with RAM configuration,
 	/// configured by the BIOS
-	const RAM_SIZE = new Range(0x1f801060, 4);
+	const RAM_SIZE = new Range(0x1f801060, 16, "RAM SIZE");
 	memory.add(RAM_SIZE);
 
 	/// Interrupt Control regs (status and mask)
-	const IRQ_CONTROL = new Range(0x1f801070, 8);
+	const IRQ_CONTROL = new Range(0x1f801070, 16);
 	memory.add(IRQ_CONTROL);
 
 	/// Direct Memory Access regs
@@ -58,7 +58,7 @@ export const initMemory = () => {
 	memory.add(SPU);
 
 	/// Expansion region 2
-	const EXPANSION_2 = new Range(0x1f802000, 66);
+	const EXPANSION_2 = new Range(0x1f802000, 66, "EXPANSION 2");
 	memory.add(EXPANSION_2);
 
 	/// Cache control register. Full address since it's in KSEG2
