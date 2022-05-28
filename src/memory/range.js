@@ -15,15 +15,15 @@ export class Range {
 	initialAddress;
 	size;
 	/**
-	 * Optional, contains the name of memory Range
-	 * @type string
-	 * */
+     * Optional, contains the name of memory Range
+     * @type string
+     * */
 	name;
 
 	/**
      * @param {number} initialAddress - initial address
      * @param {number} size - of range in bytes
-	 * @param {string} name - OPTIONAL name of range
+     * @param {string} name - OPTIONAL name of range
      * */
 	constructor(initialAddress, size, name = "") {
 		this.name = name;
@@ -52,9 +52,9 @@ export class Range {
 	}
 
 	/**
-	 * @param {number} addr
-	 * @return {null | number}
-	 * */
+     * @param {number} addr
+     * @return {null | number}
+     * */
 	contains(addr) {
 		if (addr >= this.initialAddress && addr < this.initialAddress + this.size) {
 			return addr - this.initialAddress;
@@ -99,17 +99,17 @@ export class Mapping {
 	}
 
 	/**
-	 * Masked access to memory is used to match memory mirrors and physical
-	 * */
+     * Masked access to memory is used to match memory mirrors and physical
+     * */
 	maskRegion(addr) {
 		// Index address space in 512MB chunks
-		let index = (addr >>> 29) >> 0 ;
+		let index = (addr >>> 29) >> 0;
 		return addr & REGION_MASK[index];
 	}
 
 
 	/**
-	 * WARNING!!! Unaligned memory access should be checked before fn call
+     * WARNING!!! Unaligned memory access should be checked before fn call
      * @param {number} index address where to store data
      * @param {number} data data to be stored
      * @return {void}
@@ -129,15 +129,27 @@ export class Mapping {
 	}
 
 	/**
+     * DOESN'T WORK PROPERLY WITH 16/8 bits
      * @return {number}
      * */
-	memRead(index) {
+	memRead(index, bits = 32) {
 		const addr = this.maskRegion(index);
+
 		for (let i = 0; i < this.data.length; i++) {
 			const r = this.data[i];
 			if (r.has(addr)) {
-				const actualIndex = (r.initialAddress ^ addr) >>> 2;
-				return r.data[actualIndex];
+				const i = addr - r.initialAddress;
+				if (bits === 32) {
+					return r.data[i >> 2];
+				}
+				if (bits === 16) {
+					const arr = new Int16Array(r.data.buffer);
+					return arr[i >> 1];
+				}
+				if (bits === 8) {
+					const arr = new Int8Array(r.data.buffer);
+					return arr[i];
+				}
 			}
 		}
 		throw new Error("Mapping is not implemented");

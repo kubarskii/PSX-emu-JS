@@ -29,11 +29,11 @@ export const initMemory = () => {
 
 	/// Register that has something to do with RAM configuration,
 	/// configured by the BIOS
-	const RAM_SIZE = new Range(0x1f801060, 16, "RAM SIZE");
+	const RAM_SIZE = new Range(0x1f801060, 4, "RAM SIZE");
 	memory.add(RAM_SIZE);
 
 	/// Interrupt Control regs (status and mask)
-	const IRQ_CONTROL = new Range(0x1f801070, 16);
+	const IRQ_CONTROL = new Range(0x1f801070, 8);
 	memory.add(IRQ_CONTROL);
 
 	/// Direct Memory Access regs

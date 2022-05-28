@@ -45,6 +45,12 @@ export const COP = {
 		const ops = {
 			12: () => {
 				self.setRegV(rt, self.sr);
+			},
+			13: () => {
+
+			},
+			14: () => {
+
 			}
 		};
 
@@ -53,6 +59,10 @@ export const COP = {
 		} else {
 			console.log(`Unhandled cop0 register: ${rd}`);
 		}
+
+		/**
+		 * set delay
+		 * */
 
 	},
 

@@ -1,5 +1,6 @@
 import {getSigned16} from "../../utils";
 import {memory} from "../../memory";
+
 export const ALU = {
 	ADD(i) {
 		memory.memRead(0);
@@ -30,7 +31,8 @@ export const ALU = {
 		const rs = i.rs();
 		const rt = i.rt();
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: addu  r${rd}, r${rt}, r${rs}`);
-		this.setRegV(rd, (this.getRegV(rs) + (this.getRegV(rt) >>> 0)) >>> 0);
+		const v = (this.getRegV(rs) >>> 0) + (this.getRegV(rt) >> 0);
+		this.setRegV(rd, v >>> 0);
 	},
 
 	AND(i) {

@@ -1,5 +1,5 @@
 import {loadFile, loadFileData} from "./loader/load";
-import {readAndExecute, stubFn} from "./utils";
+import {readAndExecute} from "./utils";
 import {BINARY_TYPES} from "./utils/constants";
 import {BIOS} from "./bios/bios";
 import {CPU} from "./cpu/cpu";
@@ -11,7 +11,7 @@ const loadFileErrorCb = (e) => {
 	console.warn(e);
 };
 
-console.log = stubFn;
+// console.log = stubFn;
 
 initMemory();
 

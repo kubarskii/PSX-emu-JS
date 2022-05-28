@@ -38,17 +38,17 @@ export const MA = {
 	SB(i) {
 
 		if (this.sr & 0x10000 !== 0) {
+
 			/** Cache is isolated , ignore write*/
 			console.warn("ignoring store while cache is isolated");
 			return;
 		}
-
 		const imm = i.imm();
+
 		const rt = i.rt();
 		const rs = i.rs();
 		const addr = this.getRegV(rs) + imm;
 		const v = this.getRegV(rt);
-
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: sb  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 
 		memory.memWrite(addr >>> 0, v);
@@ -84,14 +84,14 @@ export const MA = {
 	},
 
 	LB(i) {
-		const imm = getSigned16(i.imm());
+		const imm = i.imm();
 		const rt = i.rt();
 		const rs = i.rs();
 		const addr = this.getRegV(rs) + imm >>> 0;
+		const v = memory.memRead(addr, 8) << 24 >> 24;
 
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: lb      r${rs}, r${rt}, ${(imm >>> 0).toString(16)}`);
 
-		const v = memory.memRead(addr);
 		this.setRegV(rt, v);
 	}
 };
