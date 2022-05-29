@@ -114,15 +114,28 @@ export class Mapping {
      * @param {number} data data to be stored
      * @return {void}
      * */
-	memWrite(index, data) {
+	memWrite(index, data, bits = 32) {
 		const addr = this.maskRegion(index >>> 0) >>> 0;
 
 		for (let i = 0; i < this.data.length; i++) {
 			const r = this.data[i];
 			if (r.has(addr)) {
-				const actualIndex = (r.initialAddress ^ addr) >>> 2;
-				r.write(actualIndex, data >>> 0);
-				return;
+				const actualAddr = (addr >>> 0) ^ r.initialAddress;
+
+				if (bits === 32) {
+					r.data[actualAddr >> 2] = data;
+					return;
+				}
+				if (bits === 16) {
+					const arr = new Int16Array(r.data.buffer);
+					arr[actualAddr >> 1] = data;
+					return;
+				}
+				if (bits === 8) {
+					const arr = new Int8Array(r.data.buffer);
+					arr[actualAddr] = data;
+					return;
+				}
 			}
 		}
 		throw new Error(`Memory address not found: 0x${addr.toString(16)}`);
@@ -138,17 +151,17 @@ export class Mapping {
 		for (let i = 0; i < this.data.length; i++) {
 			const r = this.data[i];
 			if (r.has(addr)) {
-				const i = addr - r.initialAddress;
+				const actualAddr = (addr >>> 0) ^ r.initialAddress;
 				if (bits === 32) {
-					return r.data[i >> 2];
+					return r.data[actualAddr >> 2];
 				}
 				if (bits === 16) {
 					const arr = new Int16Array(r.data.buffer);
-					return arr[i >> 1];
+					return arr[actualAddr >> 1];
 				}
 				if (bits === 8) {
 					const arr = new Int8Array(r.data.buffer);
-					return arr[i];
+					return arr[actualAddr];
 				}
 			}
 		}

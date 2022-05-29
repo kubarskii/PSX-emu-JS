@@ -29,7 +29,7 @@ export const BRANCH = {
 	JR(i) {
 		let rs = i.rs();
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: jr       r${rs}`);
-		this._nextPc = this.getRegV(rs) >>> 0;
+		this._nextPc = this.getRegV(rs);
 	},
 
 	BEQ(i) {
@@ -68,6 +68,7 @@ export const BRANCH = {
 	BREAK() {
 	},
 	JALR() {
+		// debugger;
 	},
 	SYSCALL() {
 	},

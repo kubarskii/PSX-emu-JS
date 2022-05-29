@@ -40,7 +40,6 @@ export const ALU = {
 		const rs = i.rs();
 		const rt = i.rt();
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: and  r${rd}, r${rt}, r${rs}`);
-
 		this.setRegV(rd, this.getRegV(rs) & this.getRegV(rt));
 	},
 

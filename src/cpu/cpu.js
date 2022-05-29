@@ -263,6 +263,8 @@ export class CPU {
 		return instruction(code);
 	}
 
+	k = 0;
+
 	/**
      * Executes operation
      * @return {void}
@@ -275,11 +277,19 @@ export class CPU {
 
 		this._currentPc = this.pc;
 		const i = this.fetchInstruction(this.pc);
-
+		// debugger;
 		this.pc = this._nextPc;
 		this._nextPc = (this.pc + 4) >>> 0;
 
 		const opcode = i.opcode();
+
+		// if (i.value === 0x8c870000) {
+		// 	this.k++;
+		// 	if (this.k === 8955) {
+		// 		window.useLog = true;
+		// 		debugger;
+		// 	}
+		// }
 
 		const ops = {
 			0b000000: () => this.executeSubFunction(i),

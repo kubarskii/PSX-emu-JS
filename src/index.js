@@ -1,5 +1,5 @@
 import {loadFile, loadFileData} from "./loader/load";
-import {readAndExecute} from "./utils";
+import {readAndExecute, stubFn} from "./utils";
 import {BINARY_TYPES} from "./utils/constants";
 import {BIOS} from "./bios/bios";
 import {CPU} from "./cpu/cpu";
@@ -10,8 +10,9 @@ const test_form = document.getElementById("test_form");
 const loadFileErrorCb = (e) => {
 	console.warn(e);
 };
-
-// console.log = stubFn;
+const initialLog = console.log;
+window.useLog = false;
+console.log = (...params) => (window.useLog) ? initialLog(...params) : stubFn;
 
 initMemory();
 

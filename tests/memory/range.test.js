@@ -1,5 +1,4 @@
 import {Mapping, Range} from "../../src/memory/range";
-import {BIOS_LEN} from "../../src/utils/constants";
 import {initMemory, memory} from "../../src/memory";
 
 describe("Range and Mapping tests", () => {
@@ -14,16 +13,6 @@ describe("Range and Mapping tests", () => {
 		expect(mapping).toBeTruthy();
 	});
 
-	it("should create mapping with range containing BIOS and write values", () => {
-		const map = new Mapping();
-		const range = new Range(0x1fc00000, BIOS_LEN);
-		map.add(range);
-		map.memWrite(0x1fc00200, 0xf, true);
-		const v = map.memRead(0xbfc00200);
-		expect(range.data[128]).toBe(0xf);
-		expect(v).toBe(0xf);
-	});
-
 	it("should write to right range from mapping", () => {
 		const map = new Mapping();
 		const r1 = new Range(0x1fc00000, 8);
@@ -32,8 +21,8 @@ describe("Range and Mapping tests", () => {
 		map.add(r1);
 		map.add(r2);
 
-		map.memWrite(0xbfc00204, 0xf, true);
-		map.memWrite(0xbfc00000, 0xa, true);
+		map.memWrite(0xbfc00204, 0xf);
+		map.memWrite(0xbfc00000, 0xa);
 
 		expect(r2.data[1]).toBe(0xf);
 		expect(r1.data[0]).toBe(0xa);

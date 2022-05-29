@@ -51,7 +51,7 @@ export const MA = {
 		const v = this.getRegV(rt);
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: sb  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 
-		memory.memWrite(addr >>> 0, v);
+		memory.memWrite(addr >>> 0, v, 8);
 
 	},
 
@@ -59,6 +59,7 @@ export const MA = {
      * Store HALF WORD - 16 bit instead of 32
      * */
 	SH(i) {
+
 		if (this.sr & 0x10000 !== 0) {
 			/**
              * Cache is isolated , ignore write
@@ -77,7 +78,7 @@ export const MA = {
 
 		if (addr % 2 === 0) {
 			const v = this.getRegV(rt);
-			memory.memWrite(addr >>> 0, v);
+			memory.memWrite(addr >>> 0, v, 16);
 		} else {
 			throw new Error("StoreAddressError");
 		}
