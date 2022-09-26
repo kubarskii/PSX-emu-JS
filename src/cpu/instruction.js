@@ -1,6 +1,8 @@
 /**
  * instruction "prototype holder" to create functional object
  *  */
+import N from "../utils/typed-number";
+
 function Instruction() {
 }
 
@@ -74,7 +76,8 @@ Instruction.prototype.funct = function () {
  * Immediate values are typically used in instructions that load a value or
  * performs an arithmetic or a logical operation on a constant.
  *
- * read more: https://en.wikichip.org/wiki/immediate_value#:~:text=An%20immediate%20value%20(or%20simply,logical%20operation%20on%20a%20constant.
+ * read more:
+ * @link https://en.wikichip.org/wiki/immediate_value#:~:text=An%20immediate%20value%20(or%20simply,logical%20operation%20on%20a%20constant.
  *
  *
  * 000000 00000 00000 0000000000000000
@@ -83,7 +86,7 @@ Instruction.prototype.funct = function () {
  * @return {number} - Immediate value
  * */
 Instruction.prototype.imm = function () {
-	return (this.value << 16) >> 16;
+	return N.uint16(((this.value << 16) >> 16));
 };
 
 /**
@@ -119,7 +122,7 @@ export function instruction(v) {
 				return this.value;
 			}
 			if (hint === "string") {
-				return `0x${this.value.toString(16)}`;
+				return `0x${this.value.toString(16).padStart(8, "0")}`;
 			}
 		}
 	};

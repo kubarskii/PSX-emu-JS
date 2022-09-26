@@ -11,7 +11,7 @@ const loadFileErrorCb = (e) => {
 	console.warn(e);
 };
 const initialLog = console.log;
-window.useLog = false;
+window.useLog = true;
 console.log = (...params) => (window.useLog) ? initialLog(...params) : stubFn;
 
 initMemory();

@@ -1,5 +1,5 @@
 import {memory} from "../../memory";
-import {getSigned16} from "../../utils";
+import N from "../../utils/typed-number";
 
 export const MA = {
 	SW(i) {
@@ -7,14 +7,13 @@ export const MA = {
 			console.warn("Ignoring write as cache is isolated!");
 			return;
 		}
-		const imm = getSigned16(i.imm());
+		const imm = N.uint16(i.imm());
 		const rt = i.rt();
 		const rs = i.rs();
 		const addr = this.getRegV(rs) + imm >>> 0;
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: sw     r${rt}, $${imm.toString(16).padStart(4, 0)}(r${rs})`);
 
 		if (addr % 4 === 0) {
-
 			console.log(`memWrite: 0x${addr.toString(16).padStart(8, 0)}, 0x${this.getRegV(rt).toString(16).padStart(8, 0)}`);
 			memory.memWrite(addr >>> 0, this.getRegV(rt) >> 0);
 		} else {
@@ -25,7 +24,7 @@ export const MA = {
 	LW(i) {
 		const rs = i.rs();
 		const rt = i.rt();
-		const imm = i.imm();
+		const imm = N.int16(i.imm());
 		const addr = (this.getRegV(rs) + imm) >>> 0;
 		const v = memory.memRead(addr) >> 0;
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: lw    r${rt}, $${imm.toString(16).padStart(4, 0)}(r${rs})`);
@@ -43,15 +42,15 @@ export const MA = {
 			console.warn("ignoring store while cache is isolated");
 			return;
 		}
-		const imm = i.imm();
+		const imm = N.int16(i.imm());
 
 		const rt = i.rt();
 		const rs = i.rs();
-		const addr = this.getRegV(rs) + imm;
-		const v = this.getRegV(rt);
+		const addr = N.uint32(this.getRegV(rs) + imm);
+		const v = N.uint8(this.getRegV(rt));
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: sb  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 
-		memory.memWrite(addr >>> 0, v, 8);
+		memory.memWrite(addr, v, 8);
 
 	},
 
@@ -63,12 +62,13 @@ export const MA = {
 		if (this.sr & 0x10000 !== 0) {
 			/**
              * Cache is isolated , ignore write
+			 * TODO: remove any console!!! - takes too much time
              * */
 			console.warn("Ignoring store while cache is isolated");
 			return;
 		}
 
-		const imm = i.imm();
+		const imm = N.int16(i.imm());
 		const rt = i.rt();
 		const rs = i.rs();
 
@@ -85,13 +85,13 @@ export const MA = {
 	},
 
 	LB(i) {
-		const imm = i.imm();
+		const imm = N.int16(i.imm());
 		const rt = i.rt();
 		const rs = i.rs();
 		const addr = this.getRegV(rs) + imm >>> 0;
 		const v = memory.memRead(addr, 8) << 24 >> 24;
 
-		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: lb      r${rs}, r${rt}, ${(imm >>> 0).toString(16)}`);
+		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: lb      r${rs}, r${rt}, ${(imm).toString(16)}`);
 
 		this.setRegV(rt, v);
 	}

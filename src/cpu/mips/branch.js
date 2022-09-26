@@ -1,4 +1,5 @@
 import {getSigned16} from "../../utils";
+import N from "../../utils/typed-number";
 
 export const BRANCH = {
 	J(i) {
@@ -8,7 +9,7 @@ export const BRANCH = {
 	},
 
 	BNE(i) {
-		const imm = i.imm();
+		const imm = N.int16(i.imm());
 		const rs = i.rs();
 		const rt = i.rt();
 
@@ -50,7 +51,7 @@ export const BRANCH = {
 	},
 
 	BGTZ(i) {
-		const imm = getSigned16(i.imm());
+		const imm = N.int16(i.imm());
 		const rs = i.rs();
 		const v = this.getRegV(rs);
 

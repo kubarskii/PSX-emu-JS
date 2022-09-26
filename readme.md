@@ -18,6 +18,24 @@ Download PSX BIOS and game in BIN or ISO format and upload using web form.
 
 If you want to commit to the repository, please run linter first and cover code with tests.
 
+### Simple table with int types
+
+PSX is working with numbers up to 32 bits
+It supports the following types:
+1. int8
+2. uint8
+3. int16
+4. uint16
+5. int32
+6. uint32
+
+| Number of bits |  Min. value | Max. value |
+|:--------------:|:-----------:|:----------:|
+| 8 bit          | –128        | 127        |
+| 16 bit         | –32768      | 32767      |
+| 32 bit         | –2147483648 | 2147483647 |
+| 64 bit         | –2^63       | 2^63 - 1   |
+
 ### Memory map
 
 Memory map: https://psx-spx.consoledev.net/memorymap/

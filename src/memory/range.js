@@ -1,6 +1,7 @@
 // TODO: Separate Range and Mapping into separate files (should be easier to mock in tests later)
 
 import {UnsupportedDataTypeError} from "../errors/unsupported-data-type";
+import N from "../utils/typed-number";
 
 export const REGION_MASK = [
 	0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, // KUSEG: 2048MB
@@ -22,7 +23,7 @@ export class Range {
 
 	/**
      * @param {number} initialAddress - initial address
-     * @param {number} size - of range in bytes
+     * @param {number} size - of range in bytes(words)
      * @param {string} name - OPTIONAL name of range
      * */
 	constructor(initialAddress, size, name = "") {
@@ -112,6 +113,7 @@ export class Mapping {
      * WARNING!!! Unaligned memory access should be checked before fn call
      * @param {number} index address where to store data
      * @param {number} data data to be stored
+     * @param {32 | 16 | 8} bits
      * @return {void}
      * */
 	memWrite(index, data, bits = 32) {
@@ -123,17 +125,17 @@ export class Mapping {
 				const actualAddr = (addr >>> 0) ^ r.initialAddress;
 
 				if (bits === 32) {
-					r.data[actualAddr >> 2] = data;
+					r.data[actualAddr >> 2] = N.uint32(data);
 					return;
 				}
 				if (bits === 16) {
-					const arr = new Int16Array(r.data.buffer);
-					arr[actualAddr >> 1] = data;
+					const arr = new Uint16Array(r.data.buffer);
+					arr[actualAddr >> 1] = N.uint16(data);
 					return;
 				}
 				if (bits === 8) {
-					const arr = new Int8Array(r.data.buffer);
-					arr[actualAddr] = data;
+					const arr = new Uint8Array(r.data.buffer);
+					arr[actualAddr] = N.uint8(data);
 					return;
 				}
 			}
@@ -143,6 +145,8 @@ export class Mapping {
 
 	/**
      * DOESN'T WORK PROPERLY WITH 16/8 bits
+	 * @param {number} index
+	 * @param {32 | 16 | 8} bits
      * @return {number}
      * */
 	memRead(index, bits = 32) {
@@ -156,11 +160,11 @@ export class Mapping {
 					return r.data[actualAddr >> 2];
 				}
 				if (bits === 16) {
-					const arr = new Int16Array(r.data.buffer);
+					const arr = new Uint16Array(r.data.buffer);
 					return arr[actualAddr >> 1];
 				}
 				if (bits === 8) {
-					const arr = new Int8Array(r.data.buffer);
+					const arr = new Uint8Array(r.data.buffer);
 					return arr[actualAddr];
 				}
 			}

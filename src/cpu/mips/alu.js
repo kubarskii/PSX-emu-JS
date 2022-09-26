@@ -1,5 +1,5 @@
-import {getSigned16} from "../../utils";
 import {memory} from "../../memory";
+import N from "../../utils/typed-number";
 
 export const ALU = {
 	ADD(i) {
@@ -13,7 +13,7 @@ export const ALU = {
 	ADDI(i) {
 		const rt = i.rs();
 		const rs = i.rs();
-		const imm = getSigned16(i.imm());
+		const imm = N.int16(i.imm());
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: addi  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, (this.getRegV(rs) + imm) >>> 0);
 	},
@@ -23,7 +23,7 @@ export const ALU = {
 		const rs = i.rs();
 		const imm = i.imm() >>> 0;
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: addiu  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
-		this.setRegV(rt, (this.getRegV(rs) + imm) >>> 0);
+		this.setRegV(rt, N.uint32(this.getRegV(rs) + imm) >>> 0);
 	},
 
 	ADDU(i) {
@@ -46,13 +46,13 @@ export const ALU = {
 	ANDI(i) {
 		const rt = i.rt();
 		const rs = i.rs();
-		const imm = i.imm();
+		const imm = N.int16(i.imm());
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: andi  r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, this.getRegV(rs) & imm);
 	},
 
 	LUI(i) {
-		const imm = i.imm() & 0x0000ffff;
+		const imm = i.imm();
 		const rt = i.rt();
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: lui    r${rt}, $${(imm).toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, imm << 16);
@@ -78,7 +78,7 @@ export const ALU = {
 	ORI(i) {
 		const rt = i.rt();
 		const rs = i.rs();
-		const imm = getSigned16(i.imm() >>> 0);
+		const imm = i.imm();
 		const rsValue = this.getRegV(rs);
 		console.log(`0x${this._currentPc.toString(16).padStart(8, 0)}: ${i}: ori    r${rt}, r${rs}, $${imm.toString(16).padStart(4, 0)}`);
 		this.setRegV(rt, rsValue | imm);
