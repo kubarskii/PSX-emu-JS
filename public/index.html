@@ -1,0 +1,609 @@
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>PSX</title>
+    <script src="index.js" defer></script>
+    <style>
+        :root {
+            --bg1: #1b2838;
+            --bg2: #0d1117;
+            --panel: rgba(17, 24, 34, .72);
+            --accent: #66c0f4;
+            --accent2: #a4d007;
+            --text: #dfe7ee;
+            --text-dim: #8f98a0;
+            --focus: #fff;
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background:
+                radial-gradient(120% 90% at 20% 0%, rgba(102, 192, 244, .10) 0%, rgba(102, 192, 244, 0) 55%),
+                linear-gradient(160deg, var(--bg1) 0%, var(--bg2) 70%);
+            color: var(--text);
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* ---- top bar -------------------------------------------------- */
+        #topbar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding: 0 40px;
+            z-index: 20;
+        }
+        #topbar .logo {
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: 3px;
+            color: #fff;
+            cursor: pointer;
+        }
+        #topbar .logo span { color: var(--accent); }
+        #topbar .right { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+        #gamepad-status { font-size: 13px; color: var(--text-dim); }
+        #gamepad-status.on { color: var(--accent2); }
+        #clock { font-size: 20px; font-weight: 600; color: #fff; letter-spacing: 1px; }
+        .iconbtn {
+            background: rgba(255, 255, 255, .06);
+            border: none;
+            color: var(--text);
+            font-size: 18px;
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .iconbtn:hover, .iconbtn.focus { background: rgba(255, 255, 255, .18); box-shadow: 0 0 0 2px var(--focus); }
+        #btn-resume {
+            display: none;
+            background: linear-gradient(90deg, #75b022, #588a1b);
+            border: none;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 10px 18px;
+            border-radius: 22px;
+            cursor: pointer;
+        }
+        #btn-resume.visible { display: block; }
+        #btn-resume:hover { filter: brightness(1.15); }
+
+        /* ---- screens ---------------------------------------------------- */
+        .screen {
+            position: fixed;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            padding: 84px 0 76px;
+        }
+        .screen.active { display: flex; }
+
+        /* ---- home / library --------------------------------------------- */
+        #home-head {
+            padding: 0 48px 18px;
+            display: flex;
+            align-items: baseline;
+            gap: 16px;
+        }
+        #home-head h1 {
+            margin: 0;
+            font-size: 30px;
+            font-weight: 300;
+            letter-spacing: 4px;
+            color: #fff;
+            text-transform: uppercase;
+        }
+        #home-hint { color: var(--text-dim); font-size: 14px; }
+        #home-scroll { flex: 1; overflow-y: auto; padding: 14px 48px 150px; scrollbar-width: thin; }
+        #grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+            gap: 26px;
+        }
+        .card {
+            position: relative;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: transform .15s ease, box-shadow .15s ease;
+            outline: none;
+        }
+        .card .cover {
+            width: 100%;
+            aspect-ratio: 3 / 4;
+            object-fit: cover;
+            display: block;
+            border-radius: 8px;
+            background: linear-gradient(135deg, #24384e 0%, #101822 100%);
+        }
+        .card .cover.placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            font-size: 34px;
+            color: #3d5975;
+            background: linear-gradient(135deg, #24384e 0%, #101822 100%);
+        }
+        .card .cover.placeholder .ph-name {
+            font-size: 14px;
+            color: var(--text-dim);
+            padding: 0 14px;
+            text-align: center;
+        }
+        .card .title {
+            margin-top: 10px;
+            font-size: 14px;
+            color: var(--text-dim);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            text-align: center;
+            transition: color .15s ease;
+        }
+        .card.focus {
+            transform: scale(1.07);
+            z-index: 2;
+        }
+        .card.focus .cover {
+            box-shadow: 0 0 0 3px var(--focus), 0 12px 42px rgba(0, 0, 0, .75), 0 0 34px rgba(102, 192, 244, .35);
+        }
+        .card.focus .title { color: #fff; }
+
+        #home-empty {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 18px;
+            color: var(--text-dim);
+            font-size: 16px;
+        }
+        #home-empty.visible { display: flex; }
+        .bigbtn {
+            background: linear-gradient(90deg, #47bfff 0%, #1a44c2 100%);
+            border: none;
+            color: #fff;
+            font-size: 17px;
+            font-weight: 600;
+            padding: 16px 34px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .bigbtn:hover, .bigbtn.focus { filter: brightness(1.2); box-shadow: 0 0 0 3px var(--focus); }
+
+        /* ---- settings ---------------------------------------------------- */
+        #view-settings { align-items: center; }
+        #settings-panel {
+            width: min(92vw, 760px);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        #settings-panel h1 {
+            margin: 0 0 18px;
+            font-size: 30px;
+            font-weight: 300;
+            letter-spacing: 4px;
+            color: #fff;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .srow {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: var(--panel);
+            border-radius: 8px;
+            padding: 18px 24px;
+            cursor: pointer;
+            transition: transform .12s ease, box-shadow .12s ease;
+        }
+        .srow.focus {
+            transform: scale(1.015);
+            box-shadow: 0 0 0 3px var(--focus), 0 8px 26px rgba(0, 0, 0, .5);
+        }
+        .srow .ico { font-size: 22px; width: 34px; text-align: center; }
+        .srow .body { flex: 1; min-width: 0; }
+        .srow .name { font-size: 16px; color: #fff; }
+        .srow .value { font-size: 13px; color: var(--text-dim); margin-top: 3px; }
+        .srow .value.ok { color: var(--accent2); }
+        #settings-tty { margin-top: 18px; width: 100%; }
+        #settings-tty summary { color: var(--text-dim); font-size: 13px; cursor: pointer; }
+        #tty {
+            white-space: pre-wrap;
+            background: #0e141b;
+            border-radius: 6px;
+            min-height: 6em;
+            max-height: 12em;
+            overflow-y: auto;
+            padding: 10px;
+            font-size: 12px;
+            font-family: Consolas, monospace;
+            color: #7a8b99;
+            user-select: text;
+        }
+
+        /* ---- player ------------------------------------------------------ */
+        #view-player {
+            padding: 0;
+            background: #000;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+        }
+        #screen {
+            height: 100vh;
+            max-width: 100vw;
+            aspect-ratio: 4 / 3;
+            object-fit: contain;
+            image-rendering: pixelated;
+            background: #000;
+            display: block;
+            margin: 0 auto;
+        }
+        #player-osd {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            padding: 14px 40px 18px;
+            display: flex;
+            align-items: center;
+            gap: 26px;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, .82) 60%);
+            transition: opacity .4s ease;
+            z-index: 35;
+        }
+        #player-osd.hidden { opacity: 0; pointer-events: none; }
+        .osdbtn {
+            background: rgba(255, 255, 255, .1);
+            border: none;
+            color: #fff;
+            font-size: 14px;
+            padding: 9px 16px;
+            border-radius: 18px;
+            cursor: pointer;
+        }
+        .osdbtn:hover { background: rgba(255, 255, 255, .25); }
+        #status {
+            color: var(--accent2);
+            font-size: 14px;
+            font-family: Consolas, monospace;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            min-width: 0;
+        }
+        #player-osd .sep { flex: 1; }
+        #player-osd .hint { color: var(--text-dim); font-size: 12px; text-align: right; }
+
+        /* ---- touch controls (coarse-pointer devices only) -------------------- */
+        #touch-controls { display: none; }
+        @media (pointer: coarse) {
+            #touch-controls { display: block; }
+            #player-osd .hint { display: none; }
+            /* narrower row (icons + status only), leaves more headroom
+               above it for the touch controls */
+            #player-osd { padding: 10px 20px 14px; gap: 14px; }
+        }
+        .tp-btn {
+            -webkit-tap-highlight-color: transparent;
+            touch-action: none;
+            user-select: none;
+            background: rgba(255, 255, 255, .14);
+            border: 1px solid rgba(255, 255, 255, .28);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-weight: 700;
+        }
+        .tp-btn.active { background: rgba(102, 192, 244, .55); border-color: var(--accent); }
+        .tp-dpad {
+            position: fixed;
+            left: max(24px, env(safe-area-inset-left));
+            /* clears the auto-hiding OSD bar, which briefly sits over
+               the bottom-left corner right after entering the player */
+            bottom: calc(100px + env(safe-area-inset-bottom));
+            width: 148px;
+            height: 148px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, .08);
+            border: 1px solid rgba(255, 255, 255, .2);
+            touch-action: none;
+            z-index: 40;
+        }
+        .tp-dpad::before, .tp-dpad::after {
+            content: "";
+            position: absolute;
+            background: rgba(255, 255, 255, .22);
+        }
+        .tp-dpad::before { left: 50%; top: 14%; bottom: 14%; width: 34%; transform: translateX(-50%); border-radius: 6px; }
+        .tp-dpad::after { top: 50%; left: 14%; right: 14%; height: 34%; transform: translateY(-50%); border-radius: 6px; }
+        .tp-dpad.active { background: rgba(102, 192, 244, .18); }
+        .tp-face {
+            position: fixed;
+            right: max(22px, env(safe-area-inset-right));
+            bottom: calc(92px + env(safe-area-inset-bottom));
+            width: 168px;
+            height: 168px;
+            z-index: 40;
+        }
+        .tp-face-btn {
+            position: absolute;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            font-size: 20px;
+        }
+        .tp-triangle { top: 0; left: 56px; color: #7ce0c9; }
+        .tp-square { top: 56px; left: 0; color: #a6b1ff; }
+        .tp-circle { top: 56px; left: 112px; color: #ff9b9b; }
+        .tp-cross { top: 112px; left: 56px; color: #9fd4ff; }
+        .tp-shoulder {
+            position: fixed;
+            top: max(14px, env(safe-area-inset-top));
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 40;
+        }
+        .tp-shoulder-l { left: max(18px, env(safe-area-inset-left)); }
+        .tp-shoulder-r { right: max(18px, env(safe-area-inset-right)); }
+        .tp-shoulder .tp-btn { width: 60px; height: 36px; border-radius: 8px; font-size: 12px; }
+        .tp-center {
+            position: fixed;
+            top: max(16px, env(safe-area-inset-top));
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+            z-index: 40;
+        }
+        .tp-center .tp-btn { width: 64px; height: 26px; border-radius: 13px; font-size: 10px; letter-spacing: .5px; }
+
+        /* ---- rotate-to-landscape hint ----------------------------------------- */
+        #rotate-hint { display: none; }
+        @media (pointer: coarse) and (orientation: portrait) and (max-width: 900px) {
+            body.in-player #rotate-hint {
+                display: flex;
+                position: fixed;
+                inset: 0;
+                z-index: 90;
+                background: rgba(10, 14, 20, .96);
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 14px;
+                color: #fff;
+                font-size: 16px;
+                text-align: center;
+                padding: 0 32px;
+            }
+            #rotate-hint .icon { font-size: 44px; }
+        }
+
+        /* ---- selected-game info strip -------------------------------------- */
+        #game-info {
+            position: fixed;
+            left: 0; right: 0; bottom: 58px;
+            padding: 18px 48px 10px;
+            background: linear-gradient(180deg, rgba(13, 17, 23, 0) 0%, rgba(13, 17, 23, .88) 45%);
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            z-index: 15;
+            pointer-events: none;
+        }
+        #game-info.hidden { display: none; }
+        #gi-title { font-size: 21px; font-weight: 600; color: #fff; }
+        #gi-meta { font-size: 13px; color: var(--accent); letter-spacing: .4px; }
+        #gi-overview {
+            font-size: 13px;
+            color: var(--text-dim);
+            line-height: 1.45;
+            max-width: 900px;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        body.in-player #game-info { display: none; }
+
+        /* ---- bottom legend ------------------------------------------------ */
+        #legend {
+            position: fixed;
+            left: 0; right: 0; bottom: 0;
+            height: 58px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 30px;
+            padding: 0 48px;
+            background: linear-gradient(180deg, rgba(13, 17, 23, 0) 0%, rgba(13, 17, 23, .9) 55%);
+            font-size: 13px;
+            color: var(--text-dim);
+            z-index: 20;
+        }
+        #legend .key {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 26px;
+            height: 26px;
+            padding: 0 7px;
+            margin-right: 8px;
+            border-radius: 13px;
+            background: rgba(255, 255, 255, .12);
+            color: #fff;
+            font-weight: 700;
+            font-size: 12px;
+        }
+        body.in-player #legend, body.in-player #topbar { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="topbar">
+    <div class="logo">PSX<span>/JS</span></div>
+    <div class="right">
+        <span id="gamepad-status">🎮</span>
+        <button id="btn-resume" data-i18n="resume">▶ Вернуться в игру</button>
+        <span id="clock"></span>
+        <button id="btn-settings" class="iconbtn" data-i18n-title="settings" title="Настройки">⚙</button>
+    </div>
+</div>
+
+<div id="view-home" class="screen active">
+    <div id="home-head">
+        <h1 data-i18n="library">Библиотека</h1>
+        <span id="home-hint"></span>
+    </div>
+    <div id="home-scroll">
+        <div id="grid"></div>
+    </div>
+    <div id="home-empty">
+        <div data-i18n="emptyHint">Выбери папку с играми — карточки появятся здесь</div>
+        <button id="pick-folder-empty" class="bigbtn" data-i18n="pickFolder">Выбрать папку с играми</button>
+    </div>
+</div>
+
+<div id="view-settings" class="screen">
+    <div id="settings-panel">
+        <h1><span data-i18n="settings">Настройки</span> <button id="settings-close" class="iconbtn" data-i18n-title="back" title="Назад">✕</button></h1>
+        <div class="srow" data-action="folder">
+            <div class="ico">📁</div>
+            <div class="body">
+                <div class="name" data-i18n="rowFolder">Папка с играми</div>
+                <div class="value" id="folder-state" data-i18n="folderNotSelected">не выбрана</div>
+            </div>
+        </div>
+        <div class="srow" data-action="rescan">
+            <div class="ico">🔄</div>
+            <div class="body">
+                <div class="name" data-i18n="rowRescan">Обновить библиотеку</div>
+                <div class="value" data-i18n="rowRescanDesc">пересканировать выбранную папку</div>
+            </div>
+        </div>
+        <div class="srow" data-action="bios">
+            <div class="ico">💾</div>
+            <div class="body">
+                <div class="name">BIOS</div>
+                <div class="value" id="bios-state" data-i18n="biosNotLoaded">не загружен — выбери файл образа BIOS</div>
+            </div>
+        </div>
+        <div class="srow" data-action="file">
+            <div class="ico">📀</div>
+            <div class="body">
+                <div class="name" data-i18n="rowFile">Запустить файл</div>
+                <div class="value" data-i18n="rowFileDesc">PS-X EXE / BIN / ISO вручную</div>
+            </div>
+        </div>
+        <div class="srow" data-action="biosmenu">
+            <div class="ico">🗂️</div>
+            <div class="body">
+                <div class="name" data-i18n="rowBiosMenu">BIOS-меню консоли</div>
+                <div class="value" data-i18n="rowBiosMenuDesc">карты памяти и CD-плеер без диска</div>
+            </div>
+        </div>
+        <div class="srow" data-action="renderer">
+            <div class="ico">🎨</div>
+            <div class="body">
+                <div class="name" data-i18n="rowRenderer">Рендер</div>
+                <div class="value" id="renderer-state">программный</div>
+            </div>
+        </div>
+        <div class="srow" data-action="fullscreen">
+            <div class="ico">⛶</div>
+            <div class="body">
+                <div class="name" data-i18n="fullscreen">Полный экран</div>
+                <div class="value" data-i18n="rowFullscreenDesc">переключить (или F11)</div>
+            </div>
+        </div>
+        <div class="srow" data-action="lang">
+            <div class="ico">🌐</div>
+            <div class="body">
+                <div class="name" data-i18n="rowLang">Язык / Language</div>
+                <div class="value" id="lang-state">Русский</div>
+            </div>
+        </div>
+        <details id="settings-tty">
+            <summary data-i18n="ttyLog">TTY-лог эмулятора</summary>
+            <pre id="tty"></pre>
+        </details>
+    </div>
+    <input type="file" id="bios-file" hidden>
+    <input type="file" id="any-file" hidden>
+</div>
+
+<div id="view-player" class="screen">
+    <canvas id="screen" width="640" height="480"></canvas>
+    <div id="player-osd">
+        <button id="osd-back" class="osdbtn" data-i18n="osdBack">⟵ Библиотека</button>
+        <button id="osd-settings" class="osdbtn" data-i18n-title="settings" title="Настройки">⚙</button>
+        <button id="osd-fullscreen" class="osdbtn" data-i18n-title="fullscreen" title="Полный экран">⛶</button>
+        <span id="status" data-i18n="statusLoading">загрузка...</span>
+        <span class="sep"></span>
+        <span class="hint" data-i18n="playerHint">
+            Esc или удерживай Select — в библиотеку · стрелки/Enter/RShift = крестовина/Start/Select ·
+            X C Z V = ✕ ◯ ▢ △ · Q/E/1/3 = L1/R1/L2/R2
+        </span>
+    </div>
+
+    <div id="touch-controls">
+        <div class="tp-dpad" data-tp="dpad"></div>
+        <div class="tp-face">
+            <button class="tp-btn tp-face-btn tp-triangle" data-tp-button="TRIANGLE">△</button>
+            <button class="tp-btn tp-face-btn tp-square" data-tp-button="SQUARE">▢</button>
+            <button class="tp-btn tp-face-btn tp-circle" data-tp-button="CIRCLE">◯</button>
+            <button class="tp-btn tp-face-btn tp-cross" data-tp-button="CROSS">✕</button>
+        </div>
+        <div class="tp-shoulder tp-shoulder-l">
+            <button class="tp-btn" data-tp-button="L1">L1</button>
+            <button class="tp-btn" data-tp-button="L2">L2</button>
+        </div>
+        <div class="tp-shoulder tp-shoulder-r">
+            <button class="tp-btn" data-tp-button="R1">R1</button>
+            <button class="tp-btn" data-tp-button="R2">R2</button>
+        </div>
+        <div class="tp-center">
+            <button class="tp-btn" data-tp-button="SELECT">SELECT</button>
+            <button class="tp-btn" data-tp-button="START">START</button>
+        </div>
+    </div>
+</div>
+
+<div id="rotate-hint">
+    <div class="icon">⟳</div>
+    <div data-i18n="rotateHint">Поверни телефон горизонтально — так удобнее играть</div>
+</div>
+
+<div id="game-info" class="hidden">
+    <div id="gi-title"></div>
+    <div id="gi-meta"></div>
+    <div id="gi-overview"></div>
+</div>
+
+<div id="legend">
+    <span id="legend-a"><span class="key">A</span><span data-i18n="legendSelect">Выбрать</span></span>
+    <span id="legend-b" style="display:none"><span class="key">B</span><span data-i18n="legendBack">Назад</span></span>
+    <span id="legend-start" style="display:none"><span class="key">Start</span><span data-i18n="legendResume">Вернуться в игру</span></span>
+    <span id="legend-select"><span class="key">Select</span><span data-i18n="legendSettings">Настройки</span></span>
+</div>
+
+</body>
+</html>

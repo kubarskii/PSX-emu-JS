@@ -1,0 +1,55 @@
+{
+	"Nekketsu Oyako (Japan) [En by PentarouZero v1.0d]": {
+		"title": "Nekketsu Oyako",
+		"year": "1994",
+		"players": 2,
+		"genres": [
+			"Action",
+			"Fighting"
+		],
+		"overview": "Middle-aged housewife Saeko Hibino has a secret: she's actually a Nobel laureate theoretical physicist who devised a completely new type of antimatter fusion reactor at only 17 years old. But when a band of no-good bad guys calling themselves the Haraguro-dan find out, they figure she's perfect to help them complete their ultimate secret doomsday weapon and kidnap her. Her family aren't going to take this lying down, though, and immediately take up arms, setting out to free her by whatever means necessary!",
+		"boxart": "https://cdn.thegamesdb.net/images/original/boxart/front/24193-1.jpg"
+	},
+	"Crash Bandicoot (USA)": {
+		"title": "Crash Bandicoot",
+		"year": "1996",
+		"players": 1,
+		"genres": [
+			"Platform"
+		],
+		"overview": "Crash Bandicoot is a 1996 PlayStation video game developed by Naughty Dog and released by Sony Computer Entertainment America, under license by Universal Interactive Studios, in the USA on September 9, 1996.\r\n\r\nCrash Bandicoot, a heroic, agile and mutated marsupial who must save his girlfriend Tawna. The main antagonist is Doctor Neo Cortex, a mad scientist who was often ridiculed by the scientific community for his outlandish (but nearly workable) theories and is now motivated to prove his tormentors wrong by creating a mutated army of beasts to conquer the world. Cortex's henchman is Doctor Nitrus Brio, the insecure creator of the Evolvo-Ray. Crash's love interest is Tawna, a female bandicoot about to undergo experimentation by the Doctors. Helping Crash in his journey is an ancient witch doctor spirit named Aku Aku, who has scattered masks of himself throughout the islands to grant Crash special powers. The boss characters of the game include Papu Papu, the obese and short-tempered chief of the native village; Ripper Roo, a demented kangaroo with razor-sharp toenails; Koala Kong, a muscular but unintelligent koala; and Pinstripe Potoroo, the tommy gun-wielding bodyguard of Doctor Cortex.",
+		"boxart": "https://cdn.thegamesdb.net/images/original/boxart/front/1006-1.jpg"
+	},
+	"Diablo (USA) (En,Fr,De,Sv)": {
+		"title": "Diablo",
+		"year": "1998",
+		"players": 2,
+		"genres": [
+			"Action",
+			"Role-Playing"
+		],
+		"overview": "Set in the fictional Kingdom of Khanduras, located in the world of Sanctuary, Diablo has the player take control of a lone hero battling to rid the world of Diablo, the Lord of Terror. Beneath the town of Tristram, the player journeys through sixteen dungeon levels, ultimately entering Hell itself in order to face Diablo.",
+		"boxart": "https://cdn.thegamesdb.net/images/original/boxart/front/119335-1.jpg"
+	},
+	"Tekken 3 (USA)": {
+		"title": "Tekken 3",
+		"year": "1998",
+		"players": 2,
+		"genres": [
+			"Fighting"
+		],
+		"overview": "In Tekken 3, the mechanics and gameplay are the same as the first two games, with some tweaks. You got the arcade mode in which you fight your way through the final boss Ogre and his final form. You also got the new Survival mode and Time Attack mode from Tekken 2.",
+		"boxart": "https://cdn.thegamesdb.net/images/original/boxart/front/122714-1.jpg"
+	},
+	"Tenchu - Stealth Assassins (USA) (v1.0)": {
+		"title": "Tenchu: Stealth Assassins",
+		"year": "1998",
+		"players": 1,
+		"genres": [
+			"Action",
+			"Adventure"
+		],
+		"overview": "STEALTH ASSASSINS\r\n\r\nProwl and strike with lethal precision as ninja assassins Rikimaru or Ayame in the shadowy world of feudal Japan. Armed with mystical weapons and sheer cunning, you must shed blood with discretion and move without detection. For only the unseen survive.\r\n\r\nStealth Fighting Tactics\r\nAuthentic Ninja Weapons\r\nGo-Anywhere 3-D Environment",
+		"boxart": "https://cdn.thegamesdb.net/images/original/boxart/front/8350-2.jpg"
+	}
+}
