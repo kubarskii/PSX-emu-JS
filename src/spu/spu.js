@@ -1,10 +1,9 @@
 /**
  * SPU with sound synthesis.
  *
- * 24 ADPCM voices with ADSR envelopes, pitch stepping (linear
- * interpolation instead of the hardware's gaussian filter), noise (LFSR)
- * and stereo mixing at 44100Hz. The machine pulls samples once per video
- * frame; the browser feeds them to WebAudio.
+ * 24 ADPCM voices with ADSR envelopes, 4-tap Gaussian pitch
+ * interpolation, noise (LFSR) and stereo mixing at 44100Hz. The machine
+ * pulls samples once per video frame; the browser feeds them to WebAudio.
  *
  * Sound RAM IRQ (0x1da4 + SPUCNT bit6) is emulated: voices fetching the
  * ADPCM block at the IRQ address and transfer writes crossing it raise
@@ -26,6 +25,31 @@ export const SAMPLE_RATE = 44100;
 const F0 = [0, 60, 115, 98, 122];
 const F1 = [0, 0, -52, -55, -60];
 
+/**
+ * 4-tap Gaussian interpolation coefficients, precomputed at 8-bit
+ * fractional resolution (256 positions × 4 taps). Replaces the linear
+ * interpolation that produced audible aliasing on high-pitched voices.
+ * sigma ≈ 0.39 matches the PSX hardware filter shape.
+ */
+const GAUSS = (() => {
+	const sigma = 0.39;
+	const twoSSq = 2 * sigma * sigma;
+	const taps = new Int16Array(256 * 4);
+	for (let p = 0; p < 256; p++) {
+		const f = p / 256;
+		const g0 = Math.exp(-((1 + f) * (1 + f)) / twoSSq);
+		const g1 = Math.exp(-(f * f) / twoSSq);
+		const g2 = Math.exp(-((1 - f) * (1 - f)) / twoSSq);
+		const g3 = Math.exp(-((2 - f) * (2 - f)) / twoSSq);
+		const sum = g0 + g1 + g2 + g3;
+		taps[p * 4 + 0] = Math.round(g0 / sum * 4096);
+		taps[p * 4 + 1] = Math.round(g1 / sum * 4096);
+		taps[p * 4 + 2] = Math.round(g2 / sum * 4096);
+		taps[p * 4 + 3] = 4096 - taps[p * 4] - taps[p * 4 + 1] - taps[p * 4 + 2];
+	}
+	return taps;
+})();
+
 class Voice {
 
 	constructor() {
@@ -44,8 +68,8 @@ class Voice {
 		this.block = new Int16Array(28);
 		this.blockPos = 28;   // force decode on first step
 		this.counter = 0;     // 12.12 fixed point sample counter
-		this.cur = 0;         // current/previous samples for interpolation
-		this.prev = 0;
+		this.sbuf = new Int16Array(4); // 4 most recent raw samples (ring)
+		this.sidx = 0;        // ring write position
 		this.endx = false;
 	}
 
@@ -56,6 +80,8 @@ class Voice {
 		this.older = 0;
 		this.blockPos = 28;
 		this.counter = 0;
+		this.sbuf.fill(0);
+		this.sidx = 0;
 		this.envVol = 0;
 		this.envTick = 0;
 		this.phase = 1;
@@ -357,13 +383,19 @@ export class SPU {
 		v.counter += step;
 		while (v.counter >= 0x1000) {
 			v.counter -= 0x1000;
-			v.prev = v.cur;
 			if (v.blockPos >= 28) this.#decodeBlock(v);
-			v.cur = v.block[v.blockPos++];
+			v.sbuf[v.sidx] = v.block[v.blockPos++];
+			v.sidx = (v.sidx + 1) & 3;
 		}
-		// linear interpolation between the two most recent samples
+		// 4-tap Gaussian interpolation over the most recent samples
 		const frac = v.counter & 0xfff;
-		return (v.prev + (((v.cur - v.prev) * frac) >> 12)) | 0;
+		const gi = (frac >> 4) << 2;
+		return (
+			GAUSS[gi]     * v.sbuf[v.sidx] +
+			GAUSS[gi + 1] * v.sbuf[(v.sidx + 1) & 3] +
+			GAUSS[gi + 2] * v.sbuf[(v.sidx + 2) & 3] +
+			GAUSS[gi + 3] * v.sbuf[(v.sidx + 3) & 3]
+		) >> 12;
 	}
 
 	/**

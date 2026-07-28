@@ -41,8 +41,9 @@ src/
   cdrom/      - command/interrupt state machine, BIN (2352) and ISO (2048)
                 disc images, sector delivery via data fifo and DMA3
   joypad/     - SIO0 with a digital pad on keyboard input
-  spu/        - register-level SPU (state round-trips, sound RAM
-                transfers); audio is NOT synthesized yet
+  spu/        - 24 ADPCM voices with ADSR envelopes, 4-tap Gaussian
+                interpolation, noise (LFSR), CDDA/XA passthrough and
+                stereo mixing at 44100Hz
   psx.js      - machine wiring + scanline loop: CPU, device events and
                 timers advance per line, VBlank at line 240
 ```
@@ -67,9 +68,9 @@ boots on an American BIOS). A retail SCPH-101 BIOS boots to the
 interactive PSone menu; retail games (tested: Nekketsu Oyako) boot to
 gameplay with pad input and SPU music.
 
-Sound: 24 ADPCM voices with ADSR envelopes, noise, stereo mix at
-44100Hz through WebAudio (browsers require one click/keypress before
-audio starts).
+Sound: 24 ADPCM voices with ADSR envelopes, 4-tap Gaussian
+interpolation, noise, CDDA/XA streaming, stereo mix at 44100Hz through
+WebAudio (browsers require one click/keypress before audio starts).
 
 Frontend: a Steam-style game library backed by a folder on disk (File
 System Access API - pick the folder once, the handle persists in
@@ -90,10 +91,8 @@ misfire - this plus flipping the GPUSTAT field bit at vblank END (not
 together with the IRQ) is what fixed the shell's per-frame
 "VSync: timeout" spam for real.
 
-Known gaps: no reverb/pitch-modulation, no CDDA/XA audio streaming, no
-MDEC (FMV decodes to garbage), no memory cards, simplified GTE corner
-cases (intermediate overflow wrap), no dithering, no interlace
-rendering.
+Known gaps: no reverb/pitch-modulation, simplified GTE corner cases
+(intermediate overflow wrap), no dithering, no interlace rendering.
 
 ## Development
 
@@ -105,7 +104,7 @@ Memory map: https://psx-spx.consoledev.net/memorymap/
 
 | KUSEG (Virtual) | KSEG0 (Physical Mirror with Cache) | KSEG1 (Physical) | Memory size | Type                                                |
 |-----------------|------------------------------------|------------------|-------------|-----------------------------------------------------|
-| 00000000h       | 80000000h                          | A0000000h        | 2048K       | Main RAM (first 64K reserved for BIOS)              |          
+| 00000000h       | 80000000h                          | A0000000h        | 2048K       | Main RAM (first 64K reserved for BIOS)              |         
 | 1F000000h       | 9F000000h                          | BF000000h        | 8192K       | Expansion Region 1 (ROM/RAM)                        |
 | 1F800000h       | 9F800000h                          | --               | 1K          | Scratchpad (D-Cache used as Fast RAM)               |
 | 1F801000h       | 9F801000h                          | BF801000h        | 8K          | I/O Ports                                           |                                                    
