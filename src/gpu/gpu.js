@@ -1267,6 +1267,17 @@ export class GPU {
 	}
 
 	/**
+	 * Renders all of VRAM as 15bpp RGBA (1024x512) - a debugging view:
+	 * paletted texture pages show up as noise, CLUTs as colored strips.
+	 * @param {Uint32Array} out - 1024*512 pixels
+	 */
+	renderVram(out) {
+		const vram = this.vram;
+		const lut = RGB555_TO_RGBA;
+		for (let i = 0; i < VRAM_W * VRAM_H; i++) out[i] = lut[vram[i]];
+	}
+
+	/**
 	 * Renders the visible display area as RGBA into `out`.
 	 * @param {Uint32Array} out - width*height RGBA pixels (ABGR packed)
 	 * @param {number} width

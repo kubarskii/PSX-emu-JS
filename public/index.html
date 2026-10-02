@@ -262,6 +262,11 @@
             display: block;
             margin: 0 auto;
         }
+        /* ?vram=1 debugging view: 1024x512, keep it 2:1 */
+        #screen.vram {
+            width: min(100vw, calc(100dvh * 2));
+            height: min(100dvh, calc(100vw / 2));
+        }
         #player-osd {
             position: fixed;
             left: 0; right: 0; bottom: 0;

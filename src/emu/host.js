@@ -53,8 +53,14 @@ export class EmuHost {
 	 * @param {HTMLCanvasElement | OffscreenCanvas} canvas
 	 * @param {number} gpuScale - 0 = software renderer
 	 */
-	init(canvas, gpuScale) {
-		this.display = createDisplay(canvas, gpuScale);
+	init(canvas, gpuScale, debugVram = false) {
+		/**
+		 * debugging aid: present the whole 1024x512 VRAM as 15bpp instead
+		 * of the display area (software renderer only: with the hardware
+		 * one, rendered pixels live on the host GPU)
+		 */
+		this.debugVram = debugVram;
+		this.display = createDisplay(canvas, debugVram ? 0 : gpuScale);
 		this.emit({
 			type: "ready",
 			backend: this.display.backend,
@@ -69,7 +75,7 @@ export class EmuHost {
 	 */
 	handle(msg) {
 		switch (msg.type) {
-		case "init": this.init(msg.canvas, msg.gpuScale); return;
+		case "init": this.init(msg.canvas, msg.gpuScale, msg.debugVram === true); return;
 		case "boot": this.boot(msg); return;
 		case "stop": this.stop(); return;
 		case "buttons": this.buttons = msg.mask; return;
@@ -186,7 +192,11 @@ export class EmuHost {
 		if (frames === 0 || !this.visible || this.hidden) return;
 		const display = this.display;
 		this._presents++;
-		if (display.hw !== undefined) {
+		if (this.debugVram) {
+			display.resize(1024, 512);
+			psx.gpu.renderVram(display.frameBuffer());
+			display.present();
+		} else if (display.hw !== undefined) {
 			display.present(psx.gpu);
 		} else {
 			const w = psx.gpu.hres;

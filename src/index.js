@@ -12,7 +12,7 @@ import {
 } from "./ui/library";
 import {fetchCover} from "./ui/covers";
 import {gpuScalePreference} from "./ui/display";
-import {createEmulator} from "./emu/client";
+import {createEmulator, debugVramRequested} from "./emu/client";
 import {JIT_MIN_MOPS} from "./emu/jit";
 import {startAudio} from "./ui/audio";
 import {t, getLang, cycleLang, langName, applyStaticTranslations} from "./ui/i18n";
@@ -865,6 +865,7 @@ hookFileInput(anyFile);
 
 // created last: in main-thread mode its "ready" message arrives
 // synchronously and the handlers above must already be initialized
+if (debugVramRequested()) document.getElementById("screen").classList.add("vram");
 emu = createEmulator(document.getElementById("screen"), gpuScalePreference(), onEmuMessage);
 window.__emu = emu; // debug handle
 
