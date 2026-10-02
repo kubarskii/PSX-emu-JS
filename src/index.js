@@ -13,6 +13,7 @@ import {
 import {fetchCover} from "./ui/covers";
 import {gpuScalePreference} from "./ui/display";
 import {createEmulator} from "./emu/client";
+import {JIT_MIN_MOPS} from "./emu/jit";
 import {startAudio} from "./ui/audio";
 import {t, getLang, cycleLang, langName, applyStaticTranslations} from "./ui/i18n";
 
@@ -79,6 +80,14 @@ function onEmuMessage(msg) {
 	case "status":
 		statusOut.textContent = t(msg.key);
 		return;
+	case "jit":
+		jitSlow = msg.mops < JIT_MIN_MOPS;
+		refreshJitWarning();
+		// diagnostics for bug reports (settings -> TTY log)
+		ttyOut.textContent += `[diag] JS engine ${Math.round(msg.mops)} Mops/s` +
+			`${jitSlow ? " (JIT OFF)" : ""} · ${emu.mode} · ${displayInfo.backend}` +
+			` · ${navigator.hardwareConcurrency || "?"} cores · ${navigator.userAgent}\n`;
+		return;
 	case "stats": {
 		const mips = (msg.ips / 1e6).toFixed(1);
 		const speed = (msg.emulationSpeed * 100).toFixed(0);
@@ -99,6 +108,19 @@ function onEmuMessage(msg) {
 	default:
 		return;
 	}
+}
+
+/** the JS engine runs without its optimizing JIT (see emu/jit.js) */
+let jitSlow = false;
+let jitDismissed = false;
+const jitWarning = document.getElementById("jit-warning");
+document.getElementById("jit-warning-close").addEventListener("click", () => {
+	jitDismissed = true;
+	refreshJitWarning();
+});
+function refreshJitWarning() {
+	document.getElementById("jit-warning-text").textContent = t("jitWarning");
+	jitWarning.classList.toggle("hidden", !jitSlow || jitDismissed);
 }
 
 /** the hardware renderer draws at the element's device-pixel size */
@@ -743,6 +765,7 @@ function applyLanguage() {
 		pickFolderEmpty.textContent = t("continueFolder", {name: pendingHandle.name});
 	}
 	if (libSelected >= 0) updateGameInfo(libGames[libSelected]);
+	if (jitSlow) refreshJitWarning();
 	tickClock();
 }
 

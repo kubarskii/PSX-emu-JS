@@ -29,6 +29,17 @@ const FRAME_MS = 1000 / FRAMES_PER_SECOND;
 const VISIBLE_BUDGET_MS = 12;
 const HIDDEN_BUDGET_MS = 400;
 
+/**
+ * A single frame is only ever cut short past this wall-clock time (an
+ * extremely slow device on the main thread). Cutting a frame delivers
+ * its VBlank early, so the guest gets a fraction of the CPU time it
+ * expects between two VBlanks: per-frame work (texture streaming and
+ * decoding, game logic) is left half done - visible garbage in games.
+ * Frames that are merely slower than real time run to completion; the
+ * loop drops whole frames instead (slow motion, never corruption).
+ */
+const MAX_FRAME_MS = 250;
+
 export class PSX {
 
 	constructor() {
@@ -114,6 +125,12 @@ export class PSX {
 		 * sample-count steering aims at the total
 		 */
 		this.audioQueued = 0;
+		/**
+		 * wall-clock budget for catching up within one visible tick; whole
+		 * frames only (see MAX_FRAME_MS). The page sets a larger one when
+		 * the machine runs in a worker, where long ticks block nothing.
+		 */
+		this.tickBudgetMs = VISIBLE_BUDGET_MS;
 		this._rafId = 0;
 		this._timerId = 0;
 		this._lastTick = 0;
@@ -294,12 +311,12 @@ export class PSX {
 		if (dt > 1000) dt = 1000; // long pause: don't spiral trying to catch up
 		this._acc += dt;
 
-		const deadline = now + (this.hidden ? HIDDEN_BUDGET_MS : VISIBLE_BUDGET_MS);
+		const deadline = now + (this.hidden ? HIDDEN_BUDGET_MS : this.tickBudgetMs);
 		let ran = 0;
 		let frames = 0;
 		while (this._acc >= FRAME_MS) {
 			this._acc -= FRAME_MS;
-			ran += this.runFrame(deadline);
+			ran += this.runFrame(performance.now() + MAX_FRAME_MS);
 			frames++;
 			if (performance.now() >= deadline) {
 				this._acc = 0; // too slow: drop the backlog
@@ -313,10 +330,11 @@ export class PSX {
 	/**
 	 * Executes one video frame scanline by scanline: CPU, device events
 	 * and timers advance together, VBlank fires after the visible area.
-	 * @param {number} [deadline] - performance.now() timestamp to stop at
+	 * @param {number} [deadline] - performance.now() timestamp past which
+	 *   the frame is cut short (emergency brake, see MAX_FRAME_MS)
 	 * @return {number} - cycles executed
 	 */
-	runFrame(deadline = performance.now() + VISIBLE_BUDGET_MS) {
+	runFrame(deadline = performance.now() + MAX_FRAME_MS) {
 		let executed = 0;
 		this.timers.dotDivider = this.gpu.dotDivider;
 		let vblankDone = false;
