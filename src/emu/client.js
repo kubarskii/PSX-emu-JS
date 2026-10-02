@@ -20,6 +20,15 @@ function workerSupported(canvas) {
 	return true;
 }
 
+/** @return {boolean} - ?vram=1: show the whole VRAM (debugging aid) */
+export function debugVramRequested() {
+	try {
+		return /[?&]vram=1\b/.test(location.search);
+	} catch {
+		return false;
+	}
+}
+
 /**
  * @param {HTMLCanvasElement} canvas
  * @param {number} gpuScale - 0 = software renderer
@@ -54,7 +63,7 @@ export function createEmulator(canvas, gpuScale, onMessage) {
 			const host = new EmuHost((msg) => onMessage(msg));
 			emu.mode = "main";
 			host.handle({type: "hidden", value: document.hidden});
-			host.init(target, gpuScale);
+			host.init(target, gpuScale, debugVramRequested());
 			backend = (msg) => host.handle(msg);
 			flush();
 		}).catch((err) => onMessage({type: "error", message: String(err)}));
@@ -109,7 +118,8 @@ export function createEmulator(canvas, gpuScale, onMessage) {
 	};
 	try {
 		const offscreen = canvas.transferControlToOffscreen();
-		worker.postMessage({type: "init", canvas: offscreen, gpuScale}, [offscreen]);
+		worker.postMessage({type: "init", canvas: offscreen, gpuScale,
+			debugVram: debugVramRequested()}, [offscreen]);
 	} catch {
 		worker.terminate();
 		startMain(canvas);
