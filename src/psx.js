@@ -131,6 +131,23 @@ export class PSX {
 		 * the machine runs in a worker, where long ticks block nothing.
 		 */
 		this.tickBudgetMs = VISIBLE_BUDGET_MS;
+		/**
+		 * Let the loop leave requestAnimationFrame when frames get slow
+		 * (worker hosts set this; on the main thread rAF must stay).
+		 *
+		 * A rAF tick that emulates a frame taking longer than the refresh
+		 * interval misses the next vsync, so the following tick runs two
+		 * frames back to back and only the last one is ever shown: a
+		 * device managing ~55 emulated fps displays 30. Slow devices are
+		 * instead paced by a timer, one frame per task, and each frame is
+		 * committed to the (Offscreen)canvas as soon as it is done.
+		 */
+		this.adaptivePacing = false;
+		/** moving average of a frame's wall-clock cost (ms) */
+		this.frameMs = 0;
+		this._slowPacing = false;
+		this._yieldToken = 0;
+		this._yieldPort = null;
 		this._rafId = 0;
 		this._timerId = 0;
 		this._lastTick = 0;
@@ -177,7 +194,27 @@ export class PSX {
 
 	/** @return {boolean} - drive the loop from requestAnimationFrame */
 	#useRaf() {
-		return !this.hidden && typeof requestAnimationFrame === "function";
+		return !this.hidden && !this._slowPacing && typeof requestAnimationFrame === "function";
+	}
+
+	/**
+	 * Runs the next tick as soon as possible: a nested setTimeout(0) is
+	 * clamped to 4ms, which a frame-paced loop would pay every frame.
+	 */
+	#yieldTick() {
+		if (typeof MessageChannel !== "function") {
+			this._timerId = setTimeout(this._tick, 0);
+			return;
+		}
+		if (this._yieldPort === null) {
+			const ch = new MessageChannel();
+			ch.port1.onmessage = (e) => {
+				// a cancel/reschedule since posting makes this one stale
+				if (e.data === this._yieldToken) this._tick();
+			};
+			this._yieldPort = ch.port2;
+		}
+		this._yieldPort.postMessage(++this._yieldToken);
 	}
 
 	/**
@@ -289,7 +326,11 @@ export class PSX {
 		let delay = FRAME_MS;
 		if (!this.hidden) {
 			const elapsed = performance.now() - this._lastTick;
-			delay = Math.max(0, FRAME_MS - this._acc - elapsed);
+			delay = FRAME_MS - this._acc - elapsed;
+			if (delay < 1) {
+				this.#yieldTick();
+				return;
+			}
 		}
 		this._timerId = setTimeout(this._tick, delay);
 	}
@@ -297,6 +338,7 @@ export class PSX {
 	_cancel() {
 		if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(this._rafId);
 		clearTimeout(this._timerId);
+		this._yieldToken++;
 	}
 
 	/**
@@ -312,16 +354,33 @@ export class PSX {
 		this._acc += dt;
 
 		const deadline = now + (this.hidden ? HIDDEN_BUDGET_MS : this.tickBudgetMs);
+		// frame pacing: one frame per task, each one gets presented
+		const paced = this._slowPacing && !this.hidden;
 		let ran = 0;
 		let frames = 0;
 		while (this._acc >= FRAME_MS) {
 			this._acc -= FRAME_MS;
-			ran += this.runFrame(performance.now() + MAX_FRAME_MS);
+			const t0 = performance.now();
+			ran += this.runFrame(t0 + MAX_FRAME_MS);
 			frames++;
-			if (performance.now() >= deadline) {
+			const t1 = performance.now();
+			this.frameMs += (t1 - t0 - this.frameMs) * 0.1;
+			if (paced) {
+				// behind real time: run back to back, but never build up a
+				// backlog to burst through later
+				if (this._acc > 2 * FRAME_MS) this._acc = FRAME_MS;
+				break;
+			}
+			if (t1 >= deadline) {
 				this._acc = 0; // too slow: drop the backlog
 				break;
 			}
+		}
+		if (this.adaptivePacing) {
+			// hysteresis: leave rAF once frames eat most of a refresh
+			// interval, come back when there is clear headroom again
+			if (!this._slowPacing && this.frameMs > 13) this._slowPacing = true;
+			else if (this._slowPacing && this.frameMs < 9) this._slowPacing = false;
 		}
 		if (this.onFrame !== null) this.onFrame(frames);
 		this._updateStats(ran, now);
