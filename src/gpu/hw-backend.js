@@ -476,6 +476,16 @@ export function createHwGpu(gl, scale) {
 	const scratch = new Uint8Array(VRAM_W * VRAM_H * 4);
 	const readScratch = {buf: null, cap: 0};
 
+	/** quad vertex scratch (blits, presentation): no allocation per call */
+	const quad = new Float32Array(16);
+	const setQuad = (x0, y0, u0, v0, x1, y1, u1, v1) => {
+		quad[0] = x0; quad[1] = y0; quad[2] = u0; quad[3] = v0;
+		quad[4] = x1; quad[5] = y0; quad[6] = u1; quad[7] = v0;
+		quad[8] = x0; quad[9] = y1; quad[10] = u0; quad[11] = v1;
+		quad[12] = x1; quad[13] = y1; quad[14] = u1; quad[15] = v1;
+		return quad;
+	};
+
 	/** blits w x h texels of srcTex at (sx,sy) to (dstX,dstY) into the fbo */
 	const blitRect = (srcTex, srcScale, sx, sy, dstX, dstY, w, h, useMask, maskSet) => {
 		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -484,12 +494,8 @@ export function createHwGpu(gl, scale) {
 		gl.useProgram(blit);
 		gl.bindVertexArray(blitVao);
 		gl.bindBuffer(gl.ARRAY_BUFFER, blitVbo);
-		gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array([
-			dstX, dstY, sx, sy,
-			dstX + w, dstY, sx + w, sy,
-			dstX, dstY + h, sx, sy + h,
-			dstX + w, dstY + h, sx + w, sy + h,
-		]));
+		gl.bufferSubData(gl.ARRAY_BUFFER, 0,
+			setQuad(dstX, dstY, sx, sy, dstX + w, dstY + h, sx + w, sy + h));
 		gl.activeTexture(gl.TEXTURE0);
 		gl.bindTexture(gl.TEXTURE_2D, srcTex);
 		gl.uniform1i(U.bTex, 0);
@@ -579,9 +585,8 @@ export function createHwGpu(gl, scale) {
 			}
 			ensureState(mode, tex ? o : null, o.semi === true, o.semiMode | 0);
 			beginPrim(3);
-			const idx = [i0, i1, i2];
 			for (let k = 0; k < 3; k++) {
-				const i = idx[k];
+				const i = k === 0 ? i0 : (k === 1 ? i1 : i2);
 				const c = vc[i];
 				vertex(vx[i], vy[i], (c & 0xff) / 255, ((c >> 8) & 0xff) / 255,
 					((c >> 16) & 0xff) / 255, vu[i], vv[i]);
@@ -695,11 +700,11 @@ export function createHwGpu(gl, scale) {
 			x &= 1023; y &= 511;
 			const w0 = Math.min(w, VRAM_W - x);
 			const h0 = Math.min(h, VRAM_H - y);
-			const parts = [[x, y, w0, h0]];
-			if (w > w0) parts.push([0, y, w - w0, h0]);
-			if (h > h0) parts.push([x, 0, w0, h - h0]);
-			if (w > w0 && h > h0) parts.push([0, 0, w - w0, h - h0]);
-			for (const [rx, ry, rw, rh] of parts) {
+			// up to four pieces when the rect wraps around VRAM edges
+			for (let part = 0; part < 4; part++) {
+				const wrapX = (part & 1) !== 0, wrapY = (part & 2) !== 0;
+				const rx = wrapX ? 0 : x, ry = wrapY ? 0 : y;
+				const rw = wrapX ? w - w0 : w0, rh = wrapY ? h - h0 : h0;
 				if (rw <= 0 || rh <= 0) continue;
 				let p = 0;
 				for (let yy = 0; yy < rh; yy++) {
@@ -745,17 +750,19 @@ export function createHwGpu(gl, scale) {
 			}
 			const buf = readScratch.buf;
 			gl.readPixels(rx * S, ry * S, rw * S, rh * S, gl.RGBA, gl.UNSIGNED_BYTE, buf);
-			for (let i = 0; i < w * h; i++) {
-				const px = i % w;
-				const py = (i / w) | 0;
-				let t = 0;
-				if (px < rw && py < rh) {
-					const o = (py * S * rw * S + px * S) * 4;
-					t = (buf[o] >> 3) | ((buf[o + 1] >> 3) << 5) |
-						((buf[o + 2] >> 3) << 10) | (buf[o + 3] >= 128 ? 0x8000 : 0);
+			let i = 0;
+			for (let py = 0; py < h; py++) {
+				const rowBase = py * S * rw * S;
+				for (let px = 0; px < w; px++, i++) {
+					let t = 0;
+					if (px < rw && py < rh) {
+						const o = (rowBase + px * S) * 4;
+						t = (buf[o] >> 3) | ((buf[o + 1] >> 3) << 5) |
+							((buf[o + 2] >> 3) << 10) | (buf[o + 3] >= 128 ? 0x8000 : 0);
+					}
+					if ((i & 1) === 0) words[i >> 1] = t;
+					else words[i >> 1] |= t << 16;
 				}
-				if ((i & 1) === 0) words[i >> 1] = t;
-				else words[i >> 1] |= t << 16;
 			}
 			return words;
 		},
@@ -780,9 +787,7 @@ export function createHwGpu(gl, scale) {
 			gl.useProgram(present);
 			gl.bindVertexArray(blitVao);
 			gl.bindBuffer(gl.ARRAY_BUFFER, blitVbo);
-			gl.bufferSubData(gl.ARRAY_BUFFER, 0, new Float32Array([
-				-1, -1, 0, 0, 1, -1, 0, 0, -1, 1, 0, 0, 1, 1, 0, 0,
-			]));
+			gl.bufferSubData(gl.ARRAY_BUFFER, 0, setQuad(-1, -1, 0, 0, 1, 1, 0, 0));
 			gl.activeTexture(gl.TEXTURE0);
 			gl.bindTexture(gl.TEXTURE_2D, sampleTex);
 			gl.uniform1i(U.pTex, 0);

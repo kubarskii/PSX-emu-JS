@@ -126,7 +126,13 @@ export class EmuHost {
 			const fps = this._presents * 1000 / Math.max(1, now - this._presentStamp);
 			this._presents = 0;
 			this._presentStamp = now;
-			this.emit({type: "stats", ips: stats.ips, emulationSpeed: stats.emulationSpeed, fps});
+			this.emit({type: "stats", ips: stats.ips, emulationSpeed: stats.emulationSpeed, fps,
+				maxFrameMs: stats.maxFrameMs});
+		};
+		psx.onHitch = (h) => {
+			// goes to the settings TTY log, for bug reports
+			this._tty += `[hitch] frame ${h.ms.toFixed(0)} ms: compile ${h.compileMs.toFixed(0)} ms, ` +
+				`VRAM readback ${h.readbacks}x ${h.readbackMs.toFixed(0)} ms\n`;
 		};
 		psx.onFrame = (frames) => this.#frame(frames);
 		if (cfg.card !== null) psx.joypad.card.load(cfg.card);

@@ -40,6 +40,9 @@ const HIDDEN_BUDGET_MS = 400;
  */
 const MAX_FRAME_MS = 250;
 
+/** a frame slower than this is reported as a hitch (onHitch) */
+const HITCH_MS = 40;
+
 export class PSX {
 
 	constructor() {
@@ -162,10 +165,17 @@ export class PSX {
 		this.onFrame = null;
 
 		/** perf stats, refreshed roughly once a second */
-		this.stats = {ips: 0, emulationSpeed: 0};
+		this.stats = {ips: 0, emulationSpeed: 0, maxFrameMs: 0};
 		this._statCycles = 0;
 		this._statStamp = 0;
 		this.onStats = null;
+		/**
+		 * called for a frame that took longer than HITCH_MS of wall-clock
+		 * time, with what that time went into
+		 * @type {((info: {ms: number, compileMs: number, readbacks: number, readbackMs: number}) => void) | null}
+		 */
+		this.onHitch = null;
+		this._maxFrameMs = 0;
 
 		this._tick = () => {
 			if (!this.running) return;
@@ -361,9 +371,20 @@ export class PSX {
 		while (this._acc >= FRAME_MS) {
 			this._acc -= FRAME_MS;
 			const t0 = performance.now();
+			const c0 = this.blocks.compileMs, r0 = this.gpu.readbacks, rm0 = this.gpu.readbackMs;
 			ran += this.runFrame(t0 + MAX_FRAME_MS);
 			frames++;
 			const t1 = performance.now();
+			const ms = t1 - t0;
+			if (ms > this._maxFrameMs) this._maxFrameMs = ms;
+			if (ms > HITCH_MS && this.onHitch !== null) {
+				this.onHitch({
+					ms,
+					compileMs: this.blocks.compileMs - c0,
+					readbacks: this.gpu.readbacks - r0,
+					readbackMs: this.gpu.readbackMs - rm0,
+				});
+			}
 			this.frameMs += (t1 - t0 - this.frameMs) * 0.1;
 			if (paced) {
 				// behind real time: run back to back, but never build up a
@@ -488,6 +509,8 @@ export class PSX {
 		if (elapsed < 1000) return;
 		this.stats.ips = Math.round(this._statCycles * 1000 / elapsed);
 		this.stats.emulationSpeed = this.stats.ips / CPU_CLOCK;
+		this.stats.maxFrameMs = this._maxFrameMs;
+		this._maxFrameMs = 0;
 		this._statCycles = 0;
 		this._statStamp = now;
 		if (this.onStats !== null) this.onStats(this.stats);
