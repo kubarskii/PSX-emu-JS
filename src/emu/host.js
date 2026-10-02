@@ -105,6 +105,8 @@ export class EmuHost {
 		const display = this.display;
 		if (display.hw !== undefined) psx.gpu.hw = display.hw;
 		psx.setHidden(this.hidden);
+		// in a worker a long tick blocks no UI: catch up over more frames
+		if (typeof document === "undefined") psx.tickBudgetMs = 50;
 		psx.cpu.onTty = (ch) => {
 			this._tty += ch;
 		};
