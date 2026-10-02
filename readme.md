@@ -45,7 +45,16 @@ src/
                 transfers); audio is NOT synthesized yet
   psx.js      - machine wiring + scanline loop: CPU, device events and
                 timers advance per line, VBlank at line 240
+  emu/        - host (machine + display + frame loop driven by messages),
+                its Web Worker entry and the page-side client
 ```
+
+Threading: the emulator runs in a Web Worker and renders into the page
+canvas through an OffscreenCanvas, so the main thread only handles UI
+and input. Audio goes from the worker straight to an AudioWorklet.
+Browsers without OffscreenCanvas (or a worker that fails to start) fall
+back to running the same host on the main thread; `?worker=0` forces
+that mode for debugging.
 
 Execution model: each frame runs 263 scanlines; per line the `BlockCache`
 executes ~2146 CPU cycles, delayed device events (CDROM responses, pad
@@ -68,7 +77,8 @@ interactive PSone menu; retail games (tested: Nekketsu Oyako) boot to
 gameplay with pad input and SPU music.
 
 Sound: 24 ADPCM voices with ADSR envelopes, noise, stereo mix at
-44100Hz through WebAudio (browsers require one click/keypress before
+44100Hz through WebAudio (AudioWorklet; ScriptProcessor on non-secure
+http pages) (browsers require one click/keypress before
 audio starts).
 
 Frontend: a Steam-style game library backed by a folder on disk (File
@@ -77,6 +87,9 @@ IndexedDB). Subfolders/files with .bin/.iso images become cards, images
 next to them become covers, click to play. Xbox (any "standard" layout)
 controllers work through the Gamepad API alongside the keyboard, and
 also navigate the library grid (d-pad/stick moves, A/Start launches).
+Browsers without folder access (phones, Firefox, Safari) open games
+through a file picker instead: a .cue together with its track files,
+or a single .bin/.iso/EXE.
 
 Saves: slot 1 has an emulated memory card (full SIO0 sector protocol
 with checksums and /ACK interrupts, pre-formatted). Writes persist to
