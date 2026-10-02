@@ -15,12 +15,27 @@
  * a region that pending draws have touched. Both are what keeps real
  * scenes (thousands of primitives per frame) at full speed.
  *
- * Approximations vs the software rasterizer: no dithering, no CLUT-cache
- * staleness semantics, and mask-check combined with semi-transparency on
+ * Approximations vs the software rasterizer: no dithering, semi-
+ * transparency blends in 8 bits (mode 0 rounds up where the hardware
+ * truncates), and mask-check combined with semi-transparency on
  * the same primitive prefers the mask behavior. Primitives snap to the PSX
- * pixel grid (+0.5); presentation uses nearest upscale (no sharp-bilinear).
+ * pixel grid (see VRAM_TO_FB); presentation uses nearest upscale (no
+ * sharp-bilinear).
  */
 
+/*
+ * VRAM_TO_FB - how PSX coordinates map onto the scaled framebuffer.
+ *
+ * PSX pixel x owns framebuffer columns [x*S, x*S + S), and every read
+ * (texelFetch for textures/CLUTs, readback, presentation) takes the
+ * top-left one, x*S. The PSX rasterizer tests coverage at integer
+ * coordinates, so that top-left fragment's center (x*S + 0.5) must sit
+ * exactly on PSX coordinate x: fb = (x + 0.5/S) * S. A fixed +0.5 is only
+ * right at S=1 - at S>=2 it shifted everything written by S/2 subpixels,
+ * so reads picked up the neighbouring pixel/row: CLUTs came from the row
+ * above (wrong palettes, noisy 4/8-bit textures) and textures were off
+ * by one texel.
+ */
 const VRAM_W = 1024;
 const VRAM_H = 512;
 const MAX_VERTS = 16384;
@@ -30,23 +45,23 @@ const PRIM_VS = `#version 300 es
 layout(location=0) in vec2 aPos;
 layout(location=1) in vec3 aColor;
 layout(location=2) in vec2 aUv;
+uniform float uOff;        // 0.5 / scale, see VRAM_TO_FB
 out vec3 vColor;
 out vec2 vUv;
 void main() {
 	vColor = aColor;
 	vUv = aUv;
-	// +0.5 aligns GL fragment centers with PSX integer pixel coordinates
-	gl_Position = vec4((aPos.x + 0.5) / 512.0 - 1.0, (aPos.y + 0.5) / 256.0 - 1.0, 0.0, 1.0);
+	gl_Position = vec4((aPos.x + uOff) / 512.0 - 1.0, (aPos.y + uOff) / 256.0 - 1.0, 0.0, 1.0);
 }`;
 
 const PRIM_FS = `#version 300 es
 precision highp float;
 precision highp int;
 uniform sampler2D uVram;   // sample copy, scaled
+uniform sampler2D uClut;   // CLUT cache: one scaled row, entry i at x = i*S
 uniform int uScale;
 uniform int uMode;         // 0 flat, 1 direct 15bpp, 2 clut 4bit, 3 clut 8bit
 uniform ivec2 uPage;       // texpage base (vram texels)
-uniform ivec2 uClut;       // clut position (vram texels)
 uniform ivec4 uWin;        // texture window: uMask, uOr, vMask, vOr
 uniform int uRawTex;       // 1 = skip modulation
 uniform int uStpPass;      // 0 opaque texels only, 1 stp texels only, 2 all
@@ -62,14 +77,17 @@ int raw16(ivec2 t) {
 }
 
 void main() {
+	// interpolated values land a hair below exact integers (one triangle
+	// of a rect yields u = k - 1e-5): bias before truncating, like the
+	// software rasterizer's exact integer/float arithmetic
+	ivec3 c8 = min(ivec3(floor(vColor * 255.0 + 0.01)), ivec3(255));
 	if (uMode == 0) {
 		// quantize to the 5-bit lattice the software rasterizer writes
-		vec3 q = floor(vColor * 255.0 / 8.0) / 31.0;
-		fragColor = vec4(min(q, 1.0), uForceAlpha);
+		fragColor = vec4(vec3(c8 >> 3) / 31.0, uForceAlpha);
 		return;
 	}
-	int u = (int(floor(vUv.x)) & uWin.x) | uWin.y;
-	int v = (int(floor(vUv.y)) & uWin.z) | uWin.w;
+	int u = (int(floor(vUv.x + 0.001)) & uWin.x) | uWin.y;
+	int v = (int(floor(vUv.y + 0.001)) & uWin.z) | uWin.w;
 	int texel;
 	if (uMode == 1) {
 		// direct 15bpp: integer texel grid (matches the software rasterizer)
@@ -85,7 +103,9 @@ void main() {
 			int wordX = (uPage.x + (u >> 1)) & 1023;
 			idx = (raw16(ivec2(wordX * uScale, ((uPage.y + v) & 511) * uScale)) >> ((u & 1) << 3)) & 255;
 		}
-		texel = raw16(ivec2(((uClut.x + idx) & 1023) * uScale, uClut.y * uScale));
+		vec4 c = texelFetch(uClut, ivec2(idx * uScale, 0), 0);
+		texel = int(round(c.r * 31.0)) | (int(round(c.g * 31.0)) << 5) |
+			(int(round(c.b * 31.0)) << 10) | (int(round(c.a)) << 15);
 	}
 	if (texel == 0) discard;
 	int stp = (texel >> 15) & 1;
@@ -95,7 +115,6 @@ void main() {
 	if (uRawTex == 0) {
 		// integer modulation, bit-exact with the software rasterizer:
 		// (texel5 * color8) >> 7, clamped to 31
-		ivec3 c8 = ivec3(vColor * 255.0 + 0.5);
 		t5 = min((t5 * c8) >> 7, ivec3(31));
 	}
 	fragColor = vec4(vec3(t5) / 31.0, max(float(stp), uForceAlpha));
@@ -104,10 +123,11 @@ void main() {
 const BLIT_VS = `#version 300 es
 layout(location=0) in vec2 aPos;
 layout(location=1) in vec2 aUv;
+uniform float uOff;        // 0.5 / scale, see VRAM_TO_FB
 out vec2 vUv;
 void main() {
 	vUv = aUv;
-	gl_Position = vec4((aPos.x + 0.5) / 512.0 - 1.0, (aPos.y + 0.5) / 256.0 - 1.0, 0.0, 1.0);
+	gl_Position = vec4((aPos.x + uOff) / 512.0 - 1.0, (aPos.y + uOff) / 256.0 - 1.0, 0.0, 1.0);
 }`;
 
 const BLIT_FS = `#version 300 es
@@ -207,6 +227,14 @@ export function createHwGpu(gl, scale) {
 	const drawTex = makeTex(W, H, gl.NEAREST);
 	const sampleTex = makeTex(W, H, gl.NEAREST);
 	const stagingTex = makeTex(VRAM_W, VRAM_H, gl.NEAREST);
+	/**
+	 * CLUT cache, like the real GPU (and the software rasterizer): the
+	 * palette is fetched when a primitive names a different CLUT address
+	 * or depth, not re-read on every texel - VRAM writes under a cached
+	 * CLUT don't reach primitives still using it, and games rely on that
+	 */
+	const clutTex = makeTex(256 * S, 1, gl.NEAREST);
+	let clutKey = -1;
 
 	const fbo = gl.createFramebuffer();
 	gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
@@ -244,11 +272,18 @@ export function createHwGpu(gl, scale) {
 	const uni = (p, n) => gl.getUniformLocation(p, n);
 	const U = {
 		vram: uni(prim, "uVram"), scale: uni(prim, "uScale"), mode: uni(prim, "uMode"),
-		page: uni(prim, "uPage"), clut: uni(prim, "uClut"), win: uni(prim, "uWin"),
+		page: uni(prim, "uPage"), clutTex: uni(prim, "uClut"), win: uni(prim, "uWin"),
 		rawTex: uni(prim, "uRawTex"), stpPass: uni(prim, "uStpPass"), forceAlpha: uni(prim, "uForceAlpha"),
 		bTex: uni(blit, "uTex"), bSrcScale: uni(blit, "uSrcScale"), bForceAlpha: uni(blit, "uForceAlpha"),
 		pTex: uni(present, "uTex"), pSrcRect: uni(present, "uSrcRect"),
 	};
+
+	// VRAM_TO_FB offset, constant per backend
+	const off = 0.5 / S;
+	gl.useProgram(prim);
+	gl.uniform1f(uni(prim, "uOff"), off);
+	gl.useProgram(blit);
+	gl.uniform1f(uni(blit, "uOff"), off);
 
 	// dirty region of drawTex not yet copied into sampleTex
 	let dx0 = 0, dy0 = 0, dx1 = 0, dy1 = 0, dirty = false;
@@ -354,7 +389,10 @@ export function createHwGpu(gl, scale) {
 		gl.uniform1i(U.scale, S);
 		gl.uniform1i(U.mode, st.mode);
 		gl.uniform2i(U.page, st.pageX * 64, st.pageY);
-		gl.uniform2i(U.clut, st.clutX, st.clutY);
+		gl.activeTexture(gl.TEXTURE1);
+		gl.bindTexture(gl.TEXTURE_2D, clutTex);
+		gl.uniform1i(U.clutTex, 1);
+		gl.activeTexture(gl.TEXTURE0);
 		gl.uniform4i(U.win, st.uMask, st.uOr, st.vMask, st.vOr);
 		gl.uniform1i(U.rawTex, st.raw ? 1 : 0);
 		gl.uniform1f(U.forceAlpha, st.maskSet ? 1 : 0);
@@ -470,8 +508,39 @@ export function createHwGpu(gl, scale) {
 		markDirty(dstX, dstY, dstX + w, dstY + h);
 	};
 
+	/**
+	 * Refreshes the CLUT cache when a visible paletted primitive names a
+	 * different CLUT than the cached one (key = address + depth, as in the
+	 * software rasterizer's #clutLoad).
+	 * @param {number} mode - 2 (4bit) / 3 (8bit)
+	 * @param {{clutX: number, clutY: number}} o
+	 */
+	const loadClut = (mode, o) => {
+		const cx = o.clutX & 1023, cy = o.clutY & 511;
+		const key = cy * VRAM_W + cx + (mode << 24);
+		if (key === clutKey) return;
+		flush(); // the pending batch was drawn with the previous palette
+		clutKey = key;
+		const n = mode === 3 ? 256 : 16;
+		const first = Math.min(n, VRAM_W - cx);
+		gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+		gl.bindTexture(gl.TEXTURE_2D, clutTex);
+		gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cx * S, cy * S, first * S, 1);
+		if (first < n) { // wraps around the VRAM's right edge
+			gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, first * S, 0, 0, cy * S, (n - first) * S, 1);
+		}
+	};
+	/** @return {boolean} - the box touches the drawing area */
+	const visible = (minX, minY, maxX, maxY) =>
+		minX <= st.clipX1 && maxX >= st.clipX0 && minY <= st.clipY1 && maxY >= st.clipY0;
+
 	return {
 		scale: S,
+
+		/** GP0(01h) / GP1 reset: the next paletted primitive refetches */
+		invalidateClut() {
+			clutKey = -1;
+		},
 
 		/** @param {import("./gpu").GPU} gpu */
 		setEnv(gpu) {
@@ -502,6 +571,12 @@ export function createHwGpu(gl, scale) {
 			if (maxX - minX > 1023 || maxY - minY > 511) return; // hw size cull
 			const tex = o.tex === true;
 			const mode = !tex ? 0 : (o.texDepth === 0 ? 2 : (o.texDepth === 1 ? 3 : 1));
+			if (mode >= 2) {
+				// same culling as the software rasterizer before it loads
+				const area = (vx[i1] - vx[i0]) * (vy[i2] - vy[i0]) - (vy[i1] - vy[i0]) * (vx[i2] - vx[i0]);
+				if (area === 0 || !visible(minX, minY, maxX - 1, maxY - 1)) return;
+				loadClut(mode, o);
+			}
 			ensureState(mode, tex ? o : null, o.semi === true, o.semiMode | 0);
 			beginPrim(3);
 			const idx = [i0, i1, i2];
@@ -523,6 +598,10 @@ export function createHwGpu(gl, scale) {
 			if (w > 1023 || h > 511 || w <= 0 || h <= 0) return;
 			const tex = o.tex === true;
 			const mode = !tex ? 0 : (o.texDepth === 0 ? 2 : (o.texDepth === 1 ? 3 : 1));
+			if (mode >= 2) {
+				if (!visible(x0, y0, x0 + w - 1, y0 + h - 1)) return;
+				loadClut(mode, o);
+			}
 			ensureState(mode, tex ? o : null, o.semi === true, o.semiMode | 0);
 			beginPrim(6);
 			const r = (colorWord & 0xff) / 255;
@@ -556,8 +635,11 @@ export function createHwGpu(gl, scale) {
 			// expand to a one-pixel-wide quad, endpoints padded half a pixel
 			const nx = (-ddy / len) * 0.5, ny = (ddx / len) * 0.5;
 			const ex = (ddx / len) * 0.5, ey = (ddy / len) * 0.5;
-			const ax = x0 + 0.5 - ex, ay = y0 + 0.5 - ey;
-			const bx = x1 + 0.5 + ex, by = y1 + 0.5 + ey;
+			// a pixel's subpixel sample points span [x, x + (S-1)/S]:
+			// center the line on them
+			const c = (S - 1) / (2 * S);
+			const ax = x0 + c - ex, ay = y0 + c - ey;
+			const bx = x1 + c + ex, by = y1 + c + ey;
 			const r0 = (c0 & 0xff) / 255, g0 = ((c0 >> 8) & 0xff) / 255, b0 = ((c0 >> 16) & 0xff) / 255;
 			const r1 = (c1 & 0xff) / 255, g1 = ((c1 >> 8) & 0xff) / 255, b1 = ((c1 >> 16) & 0xff) / 255;
 			vertex(ax + nx, ay + ny, r0, g0, b0, 0, 0);
