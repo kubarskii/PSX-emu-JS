@@ -1,4 +1,5 @@
 import {readFile} from "./loader/load";
+import {classifyFiles, discFromCue} from "./loader/files";
 import {saveBinary, loadBinary} from "./loader/db";
 import {isBios} from "./utils";
 import {BINARY_TYPES} from "./utils/constants";
@@ -602,7 +603,9 @@ pickFolderEmpty.addEventListener("click", async () => {
 
 async function pickFolder() {
 	if (!librarySupported()) {
-		homeHint.textContent = t("browserUnsupported");
+		// no folder access (phones, Firefox, Safari): pick the game's
+		// files instead (.cue + its tracks, or one .bin/.iso/EXE)
+		anyFile.click();
 		return;
 	}
 	const handle = await pickLibraryFolder();
@@ -617,6 +620,13 @@ async function restoreLibrary() {
 	homeEmpty.classList.add("visible");
 	if (!librarySupported()) {
 		homeHint.textContent = t("browserUnsupported");
+		pickFolderEmpty.dataset.i18n = "pickFiles";
+		pickFolderEmpty.textContent = t("pickFiles");
+		const emptyHint = homeEmpty.querySelector("[data-i18n=\"emptyHint\"]");
+		if (emptyHint !== null) {
+			emptyHint.dataset.i18n = "emptyHintFiles";
+			emptyHint.textContent = t("emptyHintFiles");
+		}
 		return;
 	}
 	const saved = await restoreLibraryFolder();
@@ -794,18 +804,35 @@ function loadAny(buffer) {
 }
 
 /**
+ * @param {Array<File>} files - picked by the user
+ */
+async function loadFiles(files) {
+	const pick = classifyFiles(files);
+	if (pick === null) return;
+	if (pick.single !== undefined) {
+		loadAny(await readFile(pick.single));
+		return;
+	}
+	const name = pick.cue.name.replace(/\.cue$/i, "");
+	homeHint.textContent = t("reading", {name});
+	const disc = await discFromCue(pick.cue, pick.tracks, (done, total, file) => {
+		if (total > 1) homeHint.textContent = t("readingMulti", {name, done, total, file});
+	});
+	homeHint.textContent = "";
+	setDisc(disc.buffer, disc.isRaw, disc.tracks);
+	boot();
+}
+
+/**
  * @param {HTMLInputElement} input
  */
 function hookFileInput(input) {
 	input.addEventListener("change", () => {
-		const file = input.files[0];
+		const files = Array.from(input.files);
 		input.value = "";
-		if (!file) return;
-		readFile(file)
-			.then(loadAny)
-			.catch((err) => {
-				homeHint.textContent = t("loadFailed", {err});
-			});
+		loadFiles(files).catch((err) => {
+			homeHint.textContent = t("loadFailed", {err: err.message || err});
+		});
 	});
 }
 hookFileInput(biosFile);
