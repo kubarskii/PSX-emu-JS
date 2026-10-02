@@ -62,6 +62,9 @@ export class GPU {
 		 * @type {import("./hw-backend").HwGpu | null}
 		 */
 		this.hw = null;
+		/** VRAM->CPU reads served by the hw renderer (GPU sync stalls) */
+		this.readbacks = 0;
+		this.readbackMs = 0;
 		this.reset();
 	}
 
@@ -502,7 +505,10 @@ export class GPU {
 			if (h === 0) h = 0x200;
 			if (this.hw !== null) {
 				// rendered pixels only exist on the GPU: read them back
+				const t0 = performance.now();
 				this.readBuf = this.hw.imageOut(x0, y0, w, h);
+				this.readbacks++;
+				this.readbackMs += performance.now() - t0;
 				this.readPos = 0;
 				return;
 			}

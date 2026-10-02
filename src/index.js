@@ -91,7 +91,8 @@ function onEmuMessage(msg) {
 	case "stats": {
 		const mips = (msg.ips / 1e6).toFixed(1);
 		const speed = (msg.emulationSpeed * 100).toFixed(0);
-		statusOut.textContent = t("statusStats", {mips, speed}) + ` · ${Math.round(msg.fps)} fps`;
+		statusOut.textContent = t("statusStats", {mips, speed}) +
+			` · ${Math.round(msg.fps)} fps · max ${Math.round(msg.maxFrameMs)} ms`;
 		return;
 	}
 	case "tty":

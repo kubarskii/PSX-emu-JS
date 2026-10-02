@@ -52,6 +52,8 @@ export class BlockCache {
 		this.fast = new Array(FAST_SIZE >>> 2).fill(undefined);
 		/** @type {Map<number, Set<number>>} page -> block keys */
 		this.byPage = new Map();
+		/** wall-clock ms spent translating blocks (hitch diagnostics) */
+		this.compileMs = 0;
 		mem.onCodeWrite = (page) => this.invalidatePage(page);
 	}
 
@@ -98,7 +100,7 @@ export class BlockCache {
 			if (off >= 0 && off < FAST_SIZE) {
 				block = this.fast[off >>> 2];
 				if (block === undefined) {
-					block = this.compile(pc);
+					block = this.#timedCompile(pc);
 					this.fast[off >>> 2] = block;
 					this.registerBlock(pc >>> 0, block);
 				}
@@ -106,7 +108,7 @@ export class BlockCache {
 				const key = pc >>> 0;
 				block = this.blocks.get(key);
 				if (block === undefined) {
-					block = this.compile(pc);
+					block = this.#timedCompile(pc);
 					this.blocks.set(key, block);
 					this.registerBlock(key, block);
 				}
@@ -121,6 +123,17 @@ export class BlockCache {
 			executed += n;
 		}
 		return executed;
+	}
+
+	/**
+	 * @param {number} pc
+	 * @return {{fn: Function, lastOff: number} | null}
+	 */
+	#timedCompile(pc) {
+		const t0 = performance.now();
+		const block = this.compile(pc);
+		this.compileMs += performance.now() - t0;
+		return block;
 	}
 
 	/**
