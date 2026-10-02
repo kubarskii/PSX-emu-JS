@@ -19,8 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # bisect builds below check out older commits
 
       - uses: actions/setup-node@v4
         with:
@@ -29,23 +27,6 @@ jobs:
       - run: npm install
 
       - run: npm run build
-
-      # TEMPORARY regression hunt (Tekken 3 select-screen artifacts): older
-      # builds side by side under /bisect/<commit>/ - remove when found
-      - name: Bisect builds
-        run: |
-          # name:commit[:file from bafd774 applied on top]
-          for v in eb2a2f5:eb2a2f5 bafd774:bafd774 6800682:6800682 \
-                   gpu:eb2a2f5:src/gpu/gpu.js cpu:eb2a2f5:src/cpu/compiler.js \
-                   events:eb2a2f5:src/psx.js; do
-            IFS=: read -r name commit file <<< "$v"
-            git worktree add "/tmp/b-$name" "$commit"
-            if [ -n "$file" ]; then git -C "/tmp/b-$name" checkout bafd774 -- "$file"; fi
-            ln -s "$PWD/node_modules" "/tmp/b-$name/node_modules"
-            (cd "/tmp/b-$name" && NODE_ENV=production PUBLIC_PATH="/PSX-emu-JS/bisect/$name/" npx webpack)
-            mkdir -p dist/bisect
-            cp -r "/tmp/b-$name/dist" "dist/bisect/$name"
-          done
 
       - uses: actions/upload-pages-artifact@v3
         with:

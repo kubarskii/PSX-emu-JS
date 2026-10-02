@@ -233,6 +233,7 @@ export class GPU {
 		switch (cmd) {
 		case 0x00:
 			this.reset();
+			if (this.hw !== null) this.hw.invalidateClut();
 			return;
 		case 0x01: // reset command buffer
 			this.state = IDLE;
@@ -363,6 +364,7 @@ export class GPU {
 		case 0x00: return; // nop
 		case 0x01: // clear texture cache: the CLUT cache refetches too
 			this.clutCacheKey = -1;
+			if (this.hw !== null) this.hw.invalidateClut();
 			return;
 		case 0x02: this.need = 3; this.state = PARAMS; return; // fill rect
 		case 0x1f:
