@@ -45,6 +45,7 @@ export class PSX {
 		this.events = [];
 		this._eventPool = [];
 		this._eventSeq = 0;
+		this._dueScratch = [];
 		const allocEvent = () => {
 			const pool = this._eventPool;
 			if (pool.length > 0) {
@@ -324,23 +325,31 @@ export class PSX {
 		if (events.length === 0) return;
 		const now = this.cpu.cycles;
 		const pool = this._eventPool;
-		let due = null;
+		let any = false;
 		for (let i = 0; i < events.length; i++) {
 			if (events[i].due <= now) {
-				if (due === null) due = [];
-				due.push(events[i]);
+				any = true;
+				break;
 			}
 		}
-		if (due === null) return;
-		// devices react in the order their events were due; ties keep
-		// scheduling order (seq) so chained DMA completions stay FIFO
-		due.sort((a, b) => (a.due - b.due) || (a.seq - b.seq));
+		if (!any) return;
+		// a handler may pump again (I/O status read) or schedule more
+		// events: take the due list out of the shared scratch first
+		let due = this._dueScratch;
+		if (due === null) due = []; // nested pump: scratch is in use
+		this._dueScratch = null;
 		let write = 0;
 		for (let i = 0; i < events.length; i++) {
-			if (events[i].due > now) events[write++] = events[i];
+			const ev = events[i];
+			if (ev.due <= now) due.push(ev);
+			else events[write++] = ev;
 		}
 		events.length = write;
-		for (const ev of due) {
+		// devices react in the order their events were due; ties keep
+		// scheduling order (seq) so chained DMA completions stay FIFO
+		if (due.length > 1) due.sort(byDueThenSeq);
+		for (let i = 0; i < due.length; i++) {
+			const ev = due[i];
 			if (ev.target !== null) {
 				if (ev.gen < 0 || ev.gen === ev.target.gen) ev.target._onEvent(ev.kind);
 			} else {
@@ -348,6 +357,8 @@ export class PSX {
 			}
 			pool.push(ev);
 		}
+		due.length = 0;
+		this._dueScratch = due;
 	}
 
 	/**
@@ -364,6 +375,11 @@ export class PSX {
 		this._statStamp = now;
 		if (this.onStats !== null) this.onStats(this.stats);
 	}
+}
+
+/** event order: due cycle, then scheduling order */
+function byDueThenSeq(a, b) {
+	return (a.due - b.due) || (a.seq - b.seq);
 }
 
 /**

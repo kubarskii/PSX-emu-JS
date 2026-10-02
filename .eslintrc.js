@@ -26,10 +26,9 @@ module.exports = {
             "error",
             "tab"
         ],
-        "linebreak-style": [
-            "error",
-            "windows"
-        ],
+        // the repo stores LF; Windows checkouts convert to CRLF, so
+        // enforcing either style fails lint on the other platform (CI)
+        "linebreak-style": "off",
         "quotes": [
             "error",
             "double"

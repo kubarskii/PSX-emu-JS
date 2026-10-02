@@ -28,6 +28,15 @@ const MAX_BLOCK = 128;
 
 const RAM_MASK = 0x1fffff;
 
+/**
+ * KSEG0 main RAM (0x80000000-0x801fffff), where games and the kernel run
+ * practically all their code. Blocks there live in a flat table indexed
+ * by word address instead of the Map: those PCs exceed the small-integer
+ * range, so every Map lookup hashed a heap number.
+ */
+const FAST_BASE = 0x80000000;
+const FAST_SIZE = 0x200000;
+
 export class BlockCache {
 
 	/**
@@ -39,6 +48,8 @@ export class BlockCache {
 		this.mem = mem;
 		/** @type {Map<number, {fn: Function, pages: number[]} | null>} */
 		this.blocks = new Map();
+		/** @type {Array<{fn: Function, lastOff: number} | null | undefined>} */
+		this.fast = new Array(FAST_SIZE >>> 2).fill(undefined);
 		/** @type {Map<number, Set<number>>} page -> block keys */
 		this.byPage = new Map();
 		mem.onCodeWrite = (page) => this.invalidatePage(page);
@@ -82,12 +93,23 @@ export class BlockCache {
 				executed++;
 				continue;
 			}
-			const key = pc >>> 0;
-			let block = this.blocks.get(key);
-			if (block === undefined) {
-				block = this.compile(pc);
-				this.blocks.set(key, block);
-				this.registerBlock(key, block);
+			const off = (pc - FAST_BASE) | 0;
+			let block;
+			if (off >= 0 && off < FAST_SIZE) {
+				block = this.fast[off >>> 2];
+				if (block === undefined) {
+					block = this.compile(pc);
+					this.fast[off >>> 2] = block;
+					this.registerBlock(pc >>> 0, block);
+				}
+			} else {
+				const key = pc >>> 0;
+				block = this.blocks.get(key);
+				if (block === undefined) {
+					block = this.compile(pc);
+					this.blocks.set(key, block);
+					this.registerBlock(key, block);
+				}
 			}
 			if (block === null) {
 				c.step();
@@ -130,15 +152,25 @@ export class BlockCache {
 	invalidatePage(page) {
 		const set = this.byPage.get(page);
 		if (set !== undefined) {
-			for (const key of set) this.blocks.delete(key);
+			for (const key of set) this.#drop(key);
 			set.clear();
 		}
 		this.mem.codePages[page] = 0;
 	}
 
+	/**
+	 * @param {number} key - virtual start address (block cache key)
+	 */
+	#drop(key) {
+		const off = key - FAST_BASE;
+		if (off >= 0 && off < FAST_SIZE) this.fast[off >>> 2] = undefined;
+		else this.blocks.delete(key);
+	}
+
 	/** Drops everything (e.g. when a new executable is loaded). */
 	invalidateAll() {
 		this.blocks.clear();
+		this.fast.fill(undefined);
 		this.byPage.clear();
 		this.mem.codePages.fill(0);
 	}
