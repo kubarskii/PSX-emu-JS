@@ -23,7 +23,8 @@ const config = {
         path: path.resolve(__dirname, "dist"),
         publicPath,
         libraryTarget: "umd2",
-        chunkFilename: "[id].js"
+        chunkFilename: "[id].[contenthash:8].js",
+        clean: true
     },
     devServer: {
         static: {

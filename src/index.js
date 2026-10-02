@@ -1,4 +1,3 @@
-import {PSX} from "./psx";
 import {readFile} from "./loader/load";
 import {saveBinary, loadBinary} from "./loader/db";
 import {isBios} from "./utils";
@@ -11,16 +10,13 @@ import {
 	requestLibraryPermission, scanLibrary,
 } from "./ui/library";
 import {fetchCover} from "./ui/covers";
-import {createDisplay} from "./ui/display";
+import {gpuScalePreference} from "./ui/display";
+import {createEmulator} from "./emu/client";
+import {startAudio} from "./ui/audio";
 import {t, getLang, cycleLang, langName, applyStaticTranslations} from "./ui/i18n";
 
 const ttyOut = document.getElementById("tty");
-// debug handles for the console / smoke tests
-window.__PSX = PSX;
 const statusOut = document.getElementById("status");
-const canvas = document.getElementById("screen");
-const display = createDisplay(canvas);
-window.__display = display;
 const grid = document.getElementById("grid");
 const homeHint = document.getElementById("home-hint");
 const homeEmpty = document.getElementById("home-empty");
@@ -48,26 +44,84 @@ const langState = document.getElementById("lang-state");
 
 /** loaded media; the machine is rebuilt when they change */
 let biosBuf = null;
-let discBuf = null;
-let discRaw = false;
-let discTracks = null;
+/**
+ * The current disc. Its image is handed over (transferred, not copied:
+ * it can be hundreds of MB) to the emulator on the first boot, which
+ * keeps it for reboots under the same id.
+ */
+let disc = null; // {id, buffer, isRaw, tracks}
+let discSeq = 0;
 let exeBuf = null;
 /** persisted memory-card image, applied to every new machine */
 let cardImage = null;
 
-let psx = null;
+/** a machine has been booted (the emulator keeps running in the background) */
+let running = false;
 let kbMask = 0;
 
-/** debounced persistence of memory-card writes (games save sector by sector) */
-let cardSaveTimer = 0;
-function scheduleCardSave() {
-	clearTimeout(cardSaveTimer);
-	cardSaveTimer = setTimeout(() => {
-		if (psx === null) return;
-		cardImage = psx.joypad.card.data.slice().buffer;
+/** renderer the emulator actually created ("ready" message) */
+let displayInfo = {backend: "pending", hwScale: 0};
+
+/** emulator handle (worker or main thread), created at startup below */
+let emu = null;
+
+/**
+ * @param {{type: string}} msg - emulator -> page
+ */
+function onEmuMessage(msg) {
+	switch (msg.type) {
+	case "ready":
+		displayInfo = {backend: msg.backend, hwScale: msg.hwScale};
+		if (rendererState !== null) rendererState.textContent = rendererLabel();
+		observeCanvas();
+		return;
+	case "status":
+		statusOut.textContent = t(msg.key);
+		return;
+	case "stats": {
+		const mips = (msg.ips / 1e6).toFixed(1);
+		const speed = (msg.emulationSpeed * 100).toFixed(0);
+		statusOut.textContent = t("statusStats", {mips, speed});
+		return;
+	}
+	case "tty":
+		for (const ch of msg.text) onTty(ch);
+		return;
+	case "card":
+		// games save sector by sector: the host debounces, we persist
+		cardImage = msg.data;
 		saveBinary(BINARY_TYPES.MEMCARD, cardImage).catch(() => {});
-	}, 800);
+		return;
+	case "error":
+		statusOut.textContent = String(msg.message);
+		return;
+	default:
+		return;
+	}
 }
+
+/** the hardware renderer draws at the element's device-pixel size */
+let canvasObserver = null;
+function observeCanvas() {
+	if (typeof ResizeObserver !== "function") return;
+	if (canvasObserver !== null) canvasObserver.disconnect();
+	// by id: a fallback from the worker swaps in a fresh <canvas>
+	const el = document.getElementById("screen");
+	canvasObserver = new ResizeObserver(() => {
+		if (el.clientWidth === 0) return; // player screen not shown
+		const dpr = window.devicePixelRatio || 1;
+		emu.post({
+			type: "viewport",
+			width: Math.round(el.clientWidth * dpr),
+			height: Math.round(el.clientHeight * dpr),
+		});
+	});
+	canvasObserver.observe(el);
+}
+
+document.addEventListener("visibilitychange", () => {
+	emu.post({type: "hidden", value: document.hidden});
+});
 
 // ---- screens --------------------------------------------------------------
 
@@ -87,6 +141,7 @@ function showView(name) {
 		views[key].classList.toggle("active", key === name);
 	}
 	document.body.classList.toggle("in-player", name === "player");
+	emu.post({type: "visible", value: name === "player"});
 	gameInfo.classList.toggle("hidden", name !== "home" || libSelected < 0);
 	if (name === "player") pokeOsd();
 	updateChrome();
@@ -94,7 +149,6 @@ function showView(name) {
 
 /** refreshes the top bar and the button legend for the current screen */
 function updateChrome() {
-	const running = psx !== null;
 	btnResume.classList.toggle("visible", running && activeView !== "player");
 	legend.a.style.display = "";
 	legend.b.style.display = activeView === "settings" ? "" : "none";
@@ -165,9 +219,34 @@ const onTty = (ch) => {
 
 // ---- machine ----------------------------------------------------------------
 
-/** frames the Select button has been held in-game (hold = exit to library) */
-let selectHeld = 0;
-let lastPadMask = 0;
+/** when Select went down in-game (holding it ~1.5s exits to the library) */
+let selectSince = -1;
+let lastPadMask = -1;
+
+/**
+ * Input loop on the page side: keyboard, gamepads (the Gamepad API only
+ * exists here) and touch merge into one pad mask, sent on change.
+ * @param {number} now
+ */
+function pollInput(now) {
+	requestAnimationFrame(pollInput);
+	if (!running) return;
+	const mask = kbMask | pollGamepads() | pollTouch();
+	if (mask !== lastPadMask) {
+		emu.post({type: "buttons", mask});
+		if (activeView === "player" && (mask & ~lastPadMask) !== 0) pokeOsd();
+		lastPadMask = mask;
+	}
+	if ((mask & BUTTONS.SELECT) === 0) {
+		selectSince = -1;
+	} else if (selectSince < 0) {
+		selectSince = now;
+	} else if (now - selectSince >= 1500 && activeView === "player") {
+		selectSince = Infinity; // once per hold
+		showView("home");
+	}
+}
+requestAnimationFrame(pollInput);
 
 /**
  * (Re)creates the machine from the currently loaded media and boots.
@@ -181,83 +260,59 @@ function boot(opts) {
 		openSettings("bios");
 		return;
 	}
-	if (psx !== null) psx.stop();
-	psx = new PSX();
-	if (display.hw !== undefined) psx.gpu.hw = display.hw;
-	window.__psx = psx; // debug handle
-	window.psx = psx; // debugging handle
-
-	psx.cpu.onTty = onTty;
-	psx.onStats = (stats) => {
-		const mips = (stats.ips / 1e6).toFixed(1);
-		const speed = (stats.emulationSpeed * 100).toFixed(0);
-		statusOut.textContent = t("statusStats", {mips, speed});
-	};
-	psx.onFrame = () => {
-		// merge keyboard and gamepad into the pad every frame
-		const mask = kbMask | pollGamepads() | pollTouch();
-		psx.joypad.buttons = (~mask) & 0xffff;
-		if (activeView === "player" && (mask & ~lastPadMask) !== 0) pokeOsd();
-		lastPadMask = mask;
-
-		// holding Select for ~1.5s leaves the game without touching it
-		selectHeld = (mask & BUTTONS.SELECT) !== 0 ? selectHeld + 1 : 0;
-		if (selectHeld === 90 && activeView === "player") showView("home");
-
-		if (display.hw !== undefined) {
-			display.present(psx.gpu);
-		} else {
-			const w = psx.gpu.hres;
-			const h = psx.gpu.vres;
-			display.resize(w, h);
-			psx.gpu.renderDisplay(display.frameBuffer(), w, h);
-			display.present();
+	const useDisc = !biosOnly && exeBuf === null && disc !== null;
+	let discMsg = null;
+	const transfer = [];
+	if (useDisc) {
+		discMsg = {id: disc.id, buffer: disc.buffer, isRaw: disc.isRaw, tracks: disc.tracks};
+		if (disc.buffer !== null) {
+			transfer.push(disc.buffer);
+			disc.buffer = null; // the emulator owns it now
 		}
-	};
-
-	if (cardImage !== null) psx.joypad.card.load(cardImage);
-	psx.joypad.card.onWrite = scheduleCardSave;
-	if (!biosOnly && discBuf !== null) psx.insertDisc(discBuf, discRaw, discTracks);
-	psx.loadBios(biosBuf);
-	if (!biosOnly && exeBuf !== null) {
-		psx.sideloadExe(exeBuf);
-		statusOut.textContent = t("loadingExe");
-	} else if (!biosOnly && discBuf !== null && psx.fastBootDisc()) {
-		statusOut.textContent = t("fastBoot");
-	} else {
-		statusOut.textContent = t("loadingBios");
 	}
-	psx.start();
+	emu.post({
+		type: "boot",
+		bios: biosBuf.slice(0),
+		card: cardImage !== null ? cardImage.slice(0) : null,
+		disc: discMsg,
+		exe: !biosOnly && exeBuf !== null ? exeBuf.slice(0) : null,
+	}, transfer);
+	running = true;
+	lastPadMask = -1;
+	statusOut.textContent = t("loadingBios");
 	showView("player");
+}
+
+/**
+ * @param {ArrayBuffer} buffer
+ * @param {boolean} isRaw
+ * @param {object | null} tracks
+ */
+function setDisc(buffer, isRaw, tracks) {
+	disc = {id: ++discSeq, buffer, isRaw, tracks};
+	exeBuf = null;
 }
 
 // ---- audio --------------------------------------------------------------------
 
 let audioCtx = null;
+let audioStarting = false;
 function initAudio() {
 	if (audioCtx !== null) {
-		audioCtx.resume();
+		if (audioCtx.state !== "running") audioCtx.resume();
 		return;
 	}
-	audioCtx = new AudioContext({sampleRate: 44100});
-	const node = audioCtx.createScriptProcessor(1024, 0, 2);
-	const tmp = new Float32Array(2048);
-	node.onaudioprocess = (e) => {
-		const left = e.outputBuffer.getChannelData(0);
-		const right = e.outputBuffer.getChannelData(1);
-		if (psx === null) {
-			left.fill(0);
-			right.fill(0);
-			return;
-		}
-		psx.spu.drain(tmp);
-		for (let i = 0; i < 1024; i++) {
-			left[i] = tmp[i * 2];
-			right[i] = tmp[i * 2 + 1];
-		}
-	};
-	node.connect(audioCtx.destination);
-	audioCtx.resume();
+	if (audioStarting) return;
+	audioStarting = true;
+	startAudio()
+		.then(({ctx, port, kind}) => {
+			audioCtx = ctx;
+			window.__audio = {ctx, kind}; // debug handle
+			emu.post({type: "audioPort", port}, [port]);
+		})
+		.catch(() => {
+			audioStarting = false; // retry on the next gesture
+		});
 }
 // browsers allow audio only after a user gesture
 document.addEventListener("click", initAudio);
@@ -290,7 +345,7 @@ document.addEventListener("keydown", (e) => {
 	if (e.code === "Escape") {
 		if (activeView === "player") showView("home");
 		else if (activeView === "settings") showView("home");
-		else if (psx !== null) showView("player");
+		else if (running) showView("player");
 		return;
 	}
 	const b = KEYMAP[e.code];
@@ -402,7 +457,7 @@ function navigateHome(pressed) {
 	}
 	if (pressed & BUTTONS.START) {
 		// Start resumes the running game, otherwise launches the selection
-		if (psx !== null) showView("player");
+		if (running) showView("player");
 		else if (libSelected >= 0 && libCards[libSelected]) libCards[libSelected].click();
 		return;
 	}
@@ -497,13 +552,8 @@ function renderGrid(games) {
 				});
 				if (disc.exe !== undefined) {
 					exeBuf = disc.exe;
-					discBuf = null;
-					discTracks = null;
 				} else {
-					discBuf = disc.buffer;
-					discRaw = disc.isRaw;
-					discTracks = disc.tracks;
-					exeBuf = null;
+					setDisc(disc.buffer, disc.isRaw, disc.tracks);
 				}
 				boot();
 			} catch (err) {
@@ -643,11 +693,9 @@ function storedGpuScale() {
 
 function rendererLabel() {
 	const s = storedGpuScale();
-	const active = display.backend === "webgl2-hw"
-		? t("gpu", {n: display.hw.scale})
-		: t("software");
-	if ((s > 0) === (display.backend === "webgl2-hw") &&
-		(s === 0 || display.hw.scale === s)) {
+	const hw = displayInfo.backend === "webgl2-hw";
+	const active = hw ? t("gpu", {n: displayInfo.hwScale}) : t("software");
+	if ((s > 0) === hw && (s === 0 || displayInfo.hwScale === s)) {
 		return active;
 	}
 	const wanted = s > 0 ? t("gpu", {n: s}) : t("software");
@@ -738,14 +786,10 @@ function loadAny(buffer) {
 	}
 	if (isExeBuffer(buffer)) {
 		exeBuf = buffer;
-		discBuf = null;
 		boot();
 		return;
 	}
-	discRaw = buffer.byteLength % 2352 === 0;
-	discTracks = null;
-	discBuf = buffer;
-	exeBuf = null;
+	setDisc(buffer, buffer.byteLength % 2352 === 0, null);
 	boot();
 }
 
@@ -768,6 +812,11 @@ hookFileInput(biosFile);
 hookFileInput(anyFile);
 
 // ---- startup ----------------------------------------------------------------------------
+
+// created last: in main-thread mode its "ready" message arrives
+// synchronously and the handlers above must already be initialized
+emu = createEmulator(document.getElementById("screen"), gpuScalePreference(), onEmuMessage);
+window.__emu = emu; // debug handle
 
 applyLanguage();
 

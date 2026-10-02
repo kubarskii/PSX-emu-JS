@@ -101,12 +101,30 @@ export class PSX {
 		});
 
 		this.running = false;
+		/**
+		 * page/tab hidden: rAF stops firing, so the loop moves to timers
+		 * and may catch up in larger slices. Set through setHidden() by
+		 * the frontend (this class also runs inside a Web Worker, which
+		 * has no document to watch).
+		 */
+		this.hidden = false;
+		/**
+		 * audio already queued downstream of the SPU pull buffer (stereo
+		 * pairs), reported by the frontend's audio sink: the per-frame
+		 * sample-count steering aims at the total
+		 */
+		this.audioQueued = 0;
 		this._rafId = 0;
 		this._timerId = 0;
 		this._lastTick = 0;
 		this._acc = 0;
 
-		/** called after every emulated frame (render hook) */
+		/**
+		 * called once per tick (render/input hook) with the number of
+		 * frames emulated in it: 0 when the display refreshes faster
+		 * than 60Hz and no new frame is due yet
+		 * @type {((frames: number) => void) | null}
+		 */
 		this.onFrame = null;
 
 		/** perf stats, refreshed roughly once a second */
@@ -117,19 +135,32 @@ export class PSX {
 
 		this._tick = () => {
 			if (!this.running) return;
-			this._schedule();
-			this.tick();
-		};
-
-		if (typeof document !== "undefined") {
-			// a pending rAF freezes when the tab hides: move the loop
-			// over to a timer (and back) on visibility changes
-			document.addEventListener("visibilitychange", () => {
-				if (!this.running) return;
-				this._cancel();
+			if (this.#useRaf()) {
 				this._schedule();
-			});
-		}
+				this.tick();
+			} else {
+				this.tick();
+				if (this.running) this._schedule();
+			}
+		};
+	}
+
+	/**
+	 * A pending rAF freezes while the page is hidden: the loop moves over
+	 * to a timer (and back) on visibility changes.
+	 * @param {boolean} hidden
+	 */
+	setHidden(hidden) {
+		if (this.hidden === hidden) return;
+		this.hidden = hidden;
+		if (!this.running) return;
+		this._cancel();
+		this._schedule();
+	}
+
+	/** @return {boolean} - drive the loop from requestAnimationFrame */
+	#useRaf() {
+		return !this.hidden && typeof requestAnimationFrame === "function";
 	}
 
 	/**
@@ -231,15 +262,23 @@ export class PSX {
 	}
 
 	_schedule() {
-		if (typeof document !== "undefined" && document.hidden) {
-			this._timerId = setTimeout(this._tick, FRAME_MS);
-		} else {
+		if (this.#useRaf()) {
 			this._rafId = requestAnimationFrame(this._tick);
+			return;
 		}
+		// timer pacing (hidden pages, workers without rAF): sleep until
+		// the next frame is due instead of a fixed period, so frames
+		// don't bunch up in pairs when the timer fires late
+		let delay = FRAME_MS;
+		if (!this.hidden) {
+			const elapsed = performance.now() - this._lastTick;
+			delay = Math.max(0, FRAME_MS - this._acc - elapsed);
+		}
+		this._timerId = setTimeout(this._tick, delay);
 	}
 
 	_cancel() {
-		cancelAnimationFrame(this._rafId);
+		if (typeof cancelAnimationFrame === "function") cancelAnimationFrame(this._rafId);
 		clearTimeout(this._timerId);
 	}
 
@@ -255,18 +294,19 @@ export class PSX {
 		if (dt > 1000) dt = 1000; // long pause: don't spiral trying to catch up
 		this._acc += dt;
 
-		const hidden = typeof document !== "undefined" && document.hidden;
-		const deadline = now + (hidden ? HIDDEN_BUDGET_MS : VISIBLE_BUDGET_MS);
+		const deadline = now + (this.hidden ? HIDDEN_BUDGET_MS : VISIBLE_BUDGET_MS);
 		let ran = 0;
+		let frames = 0;
 		while (this._acc >= FRAME_MS) {
 			this._acc -= FRAME_MS;
 			ran += this.runFrame(deadline);
+			frames++;
 			if (performance.now() >= deadline) {
 				this._acc = 0; // too slow: drop the backlog
 				break;
 			}
 		}
-		if (this.onFrame !== null) this.onFrame();
+		if (this.onFrame !== null) this.onFrame(frames);
 		this._updateStats(ran, now);
 	}
 
@@ -305,7 +345,7 @@ export class PSX {
 		// level, and a small per-frame sample-count correction absorbs
 		// that (same 44.1kHz stream, so no pitch change) instead of
 		// letting it click on underrun or drop on overflow
-		const buffered = this.spu.bufLen >> 1;
+		const buffered = (this.spu.bufLen >> 1) + this.audioQueued;
 		let want = 735 + ((4096 - buffered) >> 5);
 		if (want < 700) want = 700;
 		else if (want > 770) want = 770;
