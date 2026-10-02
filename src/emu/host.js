@@ -8,6 +8,7 @@
  * Page -> host messages: see EmuHost#handle. Host -> page messages go
  * through `emit(msg, transfer)`:
  *   {type: "ready", backend, hwScale}  display created
+ *   {type: "jit", mops}               JS engine speed probe (see jit.js)
  *   {type: "status", key}             boot mode (i18n key)
  *   {type: "stats", ips, emulationSpeed}
  *   {type: "tty", text}               kernel putchar output
@@ -16,6 +17,7 @@
 
 import {PSX} from "../psx";
 import {createDisplay} from "../ui/display";
+import {measureJit} from "./jit";
 
 /** memory-card writes arrive sector by sector: persist once they settle */
 const CARD_SAVE_DELAY_MS = 800;
@@ -58,6 +60,7 @@ export class EmuHost {
 			backend: this.display.backend,
 			hwScale: this.display.hw !== undefined ? this.display.hw.scale : 0,
 		});
+		this.emit({type: "jit", mops: measureJit()});
 	}
 
 	/**
