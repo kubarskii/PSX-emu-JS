@@ -131,6 +131,10 @@ export class GPU {
 		this.trW = 0;
 		this.trH = 0;
 		this.trCur = 0;
+		this.trTotal = 0;
+		this.trCx = 0;
+		this.trCy = 0;
+		this.trRow = 0;
 		this.trWordsLeft = 0;
 		// VRAM->CPU read state
 		this.readBuf = null;
@@ -480,7 +484,11 @@ export class GPU {
 			if (this.trW === 0) this.trW = 0x400;
 			if (this.trH === 0) this.trH = 0x200;
 			this.trCur = 0;
-			this.trWordsLeft = Math.ceil(this.trW * this.trH / 2);
+			this.trTotal = this.trW * this.trH;
+			this.trCx = 0;
+			this.trCy = 0;
+			this.trRow = this.trY * VRAM_W;
+			this.trWordsLeft = Math.ceil(this.trTotal / 2);
 			if (this.trWordsLeft > 0) this.state = IMAGE_IN;
 			return;
 		}
@@ -499,12 +507,14 @@ export class GPU {
 			const words = Math.ceil(w * h / 2);
 			const out = new Int32Array(words);
 			const vram = this.vram;
-			for (let i = 0; i < w * h; i++) {
-				const x = (x0 + (i % w)) & 0x3ff;
-				const y = (y0 + ((i / w) | 0)) & 0x1ff;
-				const px = vram[y * VRAM_W + x];
-				if ((i & 1) === 0) out[i >> 1] = px;
-				else out[i >> 1] |= px << 16;
+			let i = 0;
+			for (let y = 0; y < h; y++) {
+				const row = ((y0 + y) & 0x1ff) * VRAM_W;
+				for (let x = 0; x < w; x++, i++) {
+					const px = vram[row + ((x0 + x) & 0x3ff)];
+					if ((i & 1) === 0) out[i >> 1] = px;
+					else out[i >> 1] |= px << 16;
+				}
 			}
 			this.readBuf = out;
 			this.readPos = 0;
@@ -517,27 +527,33 @@ export class GPU {
 
 	/** consumes one word of a CPU->VRAM image transfer */
 	#imageWord(word) {
-		const vram = this.vram;
-		for (let half = 0; half < 2; half++) {
-			const px = half === 0 ? (word & 0xffff) : (word >>> 16);
-			if (this.trCur < this.trW * this.trH) {
-				const x = (this.trX + (this.trCur % this.trW)) & 0x3ff;
-				const y = (this.trY + ((this.trCur / this.trW) | 0)) & 0x1ff;
-				const di = y * VRAM_W + x;
-				if (!(this.maskCheck && (vram[di] & 0x8000) !== 0)) {
-					vram[di] = this.maskSet ? (px | 0x8000) : px;
-				}
-				this.trCur++;
-			}
-		}
+		// the destination walks row by row; counters instead of a div/mod
+		// pair per pixel (FMV frames and texture uploads stream ~40K words)
+		if (this.trCur < this.trTotal) this.#imagePixel(word & 0xffff);
+		if (this.trCur < this.trTotal) this.#imagePixel(word >>> 16);
 		if (--this.trWordsLeft <= 0) {
 			this.state = IDLE;
 			// the whole rect is now in the shadow VRAM: mirror it into the
 			// hardware texture in one upload
 			if (this.hw !== null) {
 				this.hw.setEnv(this);
-				this.hw.imageIn(this.trX, this.trY, this.trW, this.trH, vram);
+				this.hw.imageIn(this.trX, this.trY, this.trW, this.trH, this.vram);
 			}
+		}
+	}
+
+	/** stores the next pixel of a CPU->VRAM image transfer */
+	#imagePixel(px) {
+		const vram = this.vram;
+		const di = this.trRow + ((this.trX + this.trCx) & 0x3ff);
+		if (!(this.maskCheck && (vram[di] & 0x8000) !== 0)) {
+			vram[di] = this.maskSet ? (px | 0x8000) : px;
+		}
+		this.trCur++;
+		if (++this.trCx === this.trW) {
+			this.trCx = 0;
+			this.trCy++;
+			this.trRow = ((this.trY + this.trCy) & 0x1ff) * VRAM_W;
 		}
 	}
 
@@ -778,6 +794,128 @@ export class GPU {
 		const clutCache = this.clutCache;
 
 		if (o.tex && !g) {
+			// one loop per texel depth: a per-pixel depth switch costs
+			// ~15% in the hottest loop of the rasterizer
+			if (texDepth === 0) {
+				for (let y = by0; y <= by1; y++) {
+					const span = rowSpan(w0row, w1row, w2row, A12, A20, A01, bx0, bx1);
+					if (span < 0) {
+						w0row += B12; w1row += B20; w2row += B01;
+						continue;
+					}
+					const xLo = span & 0x7ff;
+					const xHi = span >> 11;
+					const dsp = xLo - bx0;
+					let w0 = w0row + A12 * dsp, w1 = w1row + A20 * dsp, w2 = w2row + A01 * dsp;
+					const row = y * VRAM_W;
+					for (let x = xLo; x <= xHi; x++) {
+						if ((w0 | w1 | w2) >= 0) {
+							const l0 = (w0 - bias12) * inv;
+							const l1 = (w1 - bias20) * inv;
+							const l2 = (w2 - bias01) * inv;
+							let tu = ((u0 * l0 + u1 * l1 + u2 * l2) | 0) & 0xff;
+							let tv = ((v0 * l0 + v1 * l1 + v2 * l2) | 0) & 0xff;
+							tu = (tu & uMask) | uOr;
+							tv = (tv & vMask) | vOr;
+							const trow = ((pageY + tv) & 0x1ff) * VRAM_W;
+							const texel = clutCache[(vram[trow + ((baseX + (tu >> 2)) & 0x3ff)] >> ((tu & 3) << 2)) & 0xf];
+							if (texel !== 0) {
+								const stp = (texel & 0x8000) !== 0;
+								let px = raw ? texel : modulate(texel, r0, g0, b0);
+								const idx = row + x;
+								const back = vram[idx];
+								if (!maskCheck || (back & 0x8000) === 0) {
+									if (semi && stp) px = blend(back, px, semiMode) | (px & 0x8000);
+									vram[idx] = maskSet ? (px | 0x8000) : px;
+								}
+							}
+						}
+						w0 += A12; w1 += A20; w2 += A01;
+					}
+					w0row += B12; w1row += B20; w2row += B01;
+				}
+			} else if (texDepth === 1) {
+				for (let y = by0; y <= by1; y++) {
+					const span = rowSpan(w0row, w1row, w2row, A12, A20, A01, bx0, bx1);
+					if (span < 0) {
+						w0row += B12; w1row += B20; w2row += B01;
+						continue;
+					}
+					const xLo = span & 0x7ff;
+					const xHi = span >> 11;
+					const dsp = xLo - bx0;
+					let w0 = w0row + A12 * dsp, w1 = w1row + A20 * dsp, w2 = w2row + A01 * dsp;
+					const row = y * VRAM_W;
+					for (let x = xLo; x <= xHi; x++) {
+						if ((w0 | w1 | w2) >= 0) {
+							const l0 = (w0 - bias12) * inv;
+							const l1 = (w1 - bias20) * inv;
+							const l2 = (w2 - bias01) * inv;
+							let tu = ((u0 * l0 + u1 * l1 + u2 * l2) | 0) & 0xff;
+							let tv = ((v0 * l0 + v1 * l1 + v2 * l2) | 0) & 0xff;
+							tu = (tu & uMask) | uOr;
+							tv = (tv & vMask) | vOr;
+							const trow = ((pageY + tv) & 0x1ff) * VRAM_W;
+							const texel = clutCache[(vram[trow + ((baseX + (tu >> 1)) & 0x3ff)] >> ((tu & 1) << 3)) & 0xff];
+							if (texel !== 0) {
+								const stp = (texel & 0x8000) !== 0;
+								let px = raw ? texel : modulate(texel, r0, g0, b0);
+								const idx = row + x;
+								const back = vram[idx];
+								if (!maskCheck || (back & 0x8000) === 0) {
+									if (semi && stp) px = blend(back, px, semiMode) | (px & 0x8000);
+									vram[idx] = maskSet ? (px | 0x8000) : px;
+								}
+							}
+						}
+						w0 += A12; w1 += A20; w2 += A01;
+					}
+					w0row += B12; w1row += B20; w2row += B01;
+				}
+			} else {
+				for (let y = by0; y <= by1; y++) {
+					const span = rowSpan(w0row, w1row, w2row, A12, A20, A01, bx0, bx1);
+					if (span < 0) {
+						w0row += B12; w1row += B20; w2row += B01;
+						continue;
+					}
+					const xLo = span & 0x7ff;
+					const xHi = span >> 11;
+					const dsp = xLo - bx0;
+					let w0 = w0row + A12 * dsp, w1 = w1row + A20 * dsp, w2 = w2row + A01 * dsp;
+					const row = y * VRAM_W;
+					for (let x = xLo; x <= xHi; x++) {
+						if ((w0 | w1 | w2) >= 0) {
+							const l0 = (w0 - bias12) * inv;
+							const l1 = (w1 - bias20) * inv;
+							const l2 = (w2 - bias01) * inv;
+							let tu = ((u0 * l0 + u1 * l1 + u2 * l2) | 0) & 0xff;
+							let tv = ((v0 * l0 + v1 * l1 + v2 * l2) | 0) & 0xff;
+							tu = (tu & uMask) | uOr;
+							tv = (tv & vMask) | vOr;
+							const trow = ((pageY + tv) & 0x1ff) * VRAM_W;
+							const texel = vram[trow + ((baseX + tu) & 0x3ff)];
+							if (texel !== 0) {
+								const stp = (texel & 0x8000) !== 0;
+								let px = raw ? texel : modulate(texel, r0, g0, b0);
+								const idx = row + x;
+								const back = vram[idx];
+								if (!maskCheck || (back & 0x8000) === 0) {
+									if (semi && stp) px = blend(back, px, semiMode) | (px & 0x8000);
+									vram[idx] = maskSet ? (px | 0x8000) : px;
+								}
+							}
+						}
+						w0 += A12; w1 += A20; w2 += A01;
+					}
+					w0row += B12; w1row += B20; w2row += B01;
+				}
+			}
+			return;
+		}
+
+		// textured + gouraud, one loop per texel depth
+		if (texDepth === 0) {
 			for (let y = by0; y <= by1; y++) {
 				const span = rowSpan(w0row, w1row, w2row, A12, A20, A01, bx0, bx1);
 				if (span < 0) {
@@ -794,26 +932,18 @@ export class GPU {
 						const l0 = (w0 - bias12) * inv;
 						const l1 = (w1 - bias20) * inv;
 						const l2 = (w2 - bias01) * inv;
+						const r = (r0 * l0 + r1 * l1 + r2 * l2) | 0;
+						const gg = (g0 * l0 + g1 * l1 + g2 * l2) | 0;
+						const b = (b0 * l0 + b1 * l1 + b2 * l2) | 0;
 						let tu = ((u0 * l0 + u1 * l1 + u2 * l2) | 0) & 0xff;
 						let tv = ((v0 * l0 + v1 * l1 + v2 * l2) | 0) & 0xff;
 						tu = (tu & uMask) | uOr;
 						tv = (tv & vMask) | vOr;
 						const trow = ((pageY + tv) & 0x1ff) * VRAM_W;
-						let texel;
-						if (texDepth === 0) {
-							const word = vram[trow + ((baseX + (tu >> 2)) & 0x3ff)];
-							const ti = (word >> ((tu & 3) << 2)) & 0xf;
-							texel = clutCache[ti];
-						} else if (texDepth === 1) {
-							const word = vram[trow + ((baseX + (tu >> 1)) & 0x3ff)];
-							const ti = (word >> ((tu & 1) << 3)) & 0xff;
-							texel = clutCache[ti];
-						} else {
-							texel = vram[trow + ((baseX + tu) & 0x3ff)];
-						}
+						const texel = clutCache[(vram[trow + ((baseX + (tu >> 2)) & 0x3ff)] >> ((tu & 3) << 2)) & 0xf];
 						if (texel !== 0) {
 							const stp = (texel & 0x8000) !== 0;
-							let px = raw ? texel : modulate(texel, r0, g0, b0);
+							let px = raw ? texel : modulate(texel, r, gg, b);
 							const idx = row + x;
 							const back = vram[idx];
 							if (!maskCheck || (back & 0x8000) === 0) {
@@ -826,60 +956,88 @@ export class GPU {
 				}
 				w0row += B12; w1row += B20; w2row += B01;
 			}
-			return;
-		}
-
-		// textured + gouraud
-		for (let y = by0; y <= by1; y++) {
-			const span = rowSpan(w0row, w1row, w2row, A12, A20, A01, bx0, bx1);
-			if (span < 0) {
-				w0row += B12; w1row += B20; w2row += B01;
-				continue;
-			}
-			const xLo = span & 0x7ff;
-			const xHi = span >> 11;
-			const dsp = xLo - bx0;
-			let w0 = w0row + A12 * dsp, w1 = w1row + A20 * dsp, w2 = w2row + A01 * dsp;
-			const row = y * VRAM_W;
-			for (let x = xLo; x <= xHi; x++) {
-				if ((w0 | w1 | w2) >= 0) {
-					const l0 = (w0 - bias12) * inv;
-					const l1 = (w1 - bias20) * inv;
-					const l2 = (w2 - bias01) * inv;
-					const r = (r0 * l0 + r1 * l1 + r2 * l2) | 0;
-					const gg = (g0 * l0 + g1 * l1 + g2 * l2) | 0;
-					const b = (b0 * l0 + b1 * l1 + b2 * l2) | 0;
-					let tu = ((u0 * l0 + u1 * l1 + u2 * l2) | 0) & 0xff;
-					let tv = ((v0 * l0 + v1 * l1 + v2 * l2) | 0) & 0xff;
-					tu = (tu & uMask) | uOr;
-					tv = (tv & vMask) | vOr;
-					const trow = ((pageY + tv) & 0x1ff) * VRAM_W;
-					let texel;
-					if (texDepth === 0) {
-						const word = vram[trow + ((baseX + (tu >> 2)) & 0x3ff)];
-						const ti = (word >> ((tu & 3) << 2)) & 0xf;
-						texel = clutCache[ti];
-					} else if (texDepth === 1) {
-						const word = vram[trow + ((baseX + (tu >> 1)) & 0x3ff)];
-						const ti = (word >> ((tu & 1) << 3)) & 0xff;
-						texel = clutCache[ti];
-					} else {
-						texel = vram[trow + ((baseX + tu) & 0x3ff)];
-					}
-					if (texel !== 0) {
-						const stp = (texel & 0x8000) !== 0;
-						let px = raw ? texel : modulate(texel, r, gg, b);
-						const idx = row + x;
-						const back = vram[idx];
-						if (!maskCheck || (back & 0x8000) === 0) {
-							if (semi && stp) px = blend(back, px, semiMode) | (px & 0x8000);
-							vram[idx] = maskSet ? (px | 0x8000) : px;
+		} else if (texDepth === 1) {
+			for (let y = by0; y <= by1; y++) {
+				const span = rowSpan(w0row, w1row, w2row, A12, A20, A01, bx0, bx1);
+				if (span < 0) {
+					w0row += B12; w1row += B20; w2row += B01;
+					continue;
+				}
+				const xLo = span & 0x7ff;
+				const xHi = span >> 11;
+				const dsp = xLo - bx0;
+				let w0 = w0row + A12 * dsp, w1 = w1row + A20 * dsp, w2 = w2row + A01 * dsp;
+				const row = y * VRAM_W;
+				for (let x = xLo; x <= xHi; x++) {
+					if ((w0 | w1 | w2) >= 0) {
+						const l0 = (w0 - bias12) * inv;
+						const l1 = (w1 - bias20) * inv;
+						const l2 = (w2 - bias01) * inv;
+						const r = (r0 * l0 + r1 * l1 + r2 * l2) | 0;
+						const gg = (g0 * l0 + g1 * l1 + g2 * l2) | 0;
+						const b = (b0 * l0 + b1 * l1 + b2 * l2) | 0;
+						let tu = ((u0 * l0 + u1 * l1 + u2 * l2) | 0) & 0xff;
+						let tv = ((v0 * l0 + v1 * l1 + v2 * l2) | 0) & 0xff;
+						tu = (tu & uMask) | uOr;
+						tv = (tv & vMask) | vOr;
+						const trow = ((pageY + tv) & 0x1ff) * VRAM_W;
+						const texel = clutCache[(vram[trow + ((baseX + (tu >> 1)) & 0x3ff)] >> ((tu & 1) << 3)) & 0xff];
+						if (texel !== 0) {
+							const stp = (texel & 0x8000) !== 0;
+							let px = raw ? texel : modulate(texel, r, gg, b);
+							const idx = row + x;
+							const back = vram[idx];
+							if (!maskCheck || (back & 0x8000) === 0) {
+								if (semi && stp) px = blend(back, px, semiMode) | (px & 0x8000);
+								vram[idx] = maskSet ? (px | 0x8000) : px;
+							}
 						}
 					}
+					w0 += A12; w1 += A20; w2 += A01;
 				}
-				w0 += A12; w1 += A20; w2 += A01;
+				w0row += B12; w1row += B20; w2row += B01;
 			}
-			w0row += B12; w1row += B20; w2row += B01;
+		} else {
+			for (let y = by0; y <= by1; y++) {
+				const span = rowSpan(w0row, w1row, w2row, A12, A20, A01, bx0, bx1);
+				if (span < 0) {
+					w0row += B12; w1row += B20; w2row += B01;
+					continue;
+				}
+				const xLo = span & 0x7ff;
+				const xHi = span >> 11;
+				const dsp = xLo - bx0;
+				let w0 = w0row + A12 * dsp, w1 = w1row + A20 * dsp, w2 = w2row + A01 * dsp;
+				const row = y * VRAM_W;
+				for (let x = xLo; x <= xHi; x++) {
+					if ((w0 | w1 | w2) >= 0) {
+						const l0 = (w0 - bias12) * inv;
+						const l1 = (w1 - bias20) * inv;
+						const l2 = (w2 - bias01) * inv;
+						const r = (r0 * l0 + r1 * l1 + r2 * l2) | 0;
+						const gg = (g0 * l0 + g1 * l1 + g2 * l2) | 0;
+						const b = (b0 * l0 + b1 * l1 + b2 * l2) | 0;
+						let tu = ((u0 * l0 + u1 * l1 + u2 * l2) | 0) & 0xff;
+						let tv = ((v0 * l0 + v1 * l1 + v2 * l2) | 0) & 0xff;
+						tu = (tu & uMask) | uOr;
+						tv = (tv & vMask) | vOr;
+						const trow = ((pageY + tv) & 0x1ff) * VRAM_W;
+						const texel = vram[trow + ((baseX + tu) & 0x3ff)];
+						if (texel !== 0) {
+							const stp = (texel & 0x8000) !== 0;
+							let px = raw ? texel : modulate(texel, r, gg, b);
+							const idx = row + x;
+							const back = vram[idx];
+							if (!maskCheck || (back & 0x8000) === 0) {
+								if (semi && stp) px = blend(back, px, semiMode) | (px & 0x8000);
+								vram[idx] = maskSet ? (px | 0x8000) : px;
+							}
+						}
+					}
+					w0 += A12; w1 += A20; w2 += A01;
+				}
+				w0row += B12; w1row += B20; w2row += B01;
+			}
 		}
 	}
 
@@ -1222,25 +1380,30 @@ function modulate(texel, r, g, b) {
 }
 
 /**
- * Semi-transparency blend of back and front 15bit pixels.
+ * Semi-transparency blend of back and front 15bit pixels (bit 15 of the
+ * result is always clear). Channels are unrolled: this runs per pixel.
  * @param {number} mode - 0: B/2+F/2, 1: B+F, 2: B-F, 3: B+F/4
  * @return {number}
  */
 function blend(back, front, mode) {
-	let out = 0;
-	for (let shift = 0; shift <= 10; shift += 5) {
-		const bc = (back >> shift) & 0x1f;
-		const fc = (front >> shift) & 0x1f;
-		let c;
-		switch (mode) {
-		case 0: c = (bc >> 1) + (fc >> 1); break;
-		case 1: c = bc + fc; break;
-		case 2: c = bc - fc; break;
-		default: c = bc + (fc >> 2); break;
-		}
-		if (c < 0) c = 0;
-		if (c > 31) c = 31;
-		out |= c << shift;
+	if (mode === 0) {
+		// per-channel halves never carry into the next 5bit field
+		return ((back >> 1) & 0x3def) + ((front >> 1) & 0x3def);
 	}
-	return out;
+	const br = back & 0x1f, bg = (back >> 5) & 0x1f, bb = (back >> 10) & 0x1f;
+	let fr = front & 0x1f, fg = (front >> 5) & 0x1f, fb = (front >> 10) & 0x1f;
+	let r, g, b;
+	if (mode === 2) {
+		r = br - fr; if (r < 0) r = 0;
+		g = bg - fg; if (g < 0) g = 0;
+		b = bb - fb; if (b < 0) b = 0;
+		return r | (g << 5) | (b << 10);
+	}
+	if (mode === 3) {
+		fr >>= 2; fg >>= 2; fb >>= 2;
+	}
+	r = br + fr; if (r > 31) r = 31;
+	g = bg + fg; if (g > 31) g = 31;
+	b = bb + fb; if (b > 31) b = 31;
+	return r | (g << 5) | (b << 10);
 }

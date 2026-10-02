@@ -190,13 +190,30 @@ function createHwDisplay(canvas, scale) {
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
 	gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+	gl.bindBuffer(gl.ARRAY_BUFFER, swVbo);
+	gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+		-1, -1, 0, 1,
+		1, -1, 1, 1,
+		-1, 1, 0, 0,
+		1, 1, 1, 0,
+	]), gl.STATIC_DRAW);
 	let swW = 0, swH = 0;
 	let swPixels = new Uint32Array(0);
+	let swBytes = new Uint8Array(0);
 
+	/** device-pixel size of the on-page element (set by the frontend) */
+	let viewW = 0, viewH = 0;
 	const fitCanvas = () => {
-		const dpr = (typeof devicePixelRatio === "number" ? devicePixelRatio : 1);
-		const w = Math.max(1, Math.min(4096, Math.round(canvas.clientWidth * dpr) || 1024));
-		const h = Math.max(1, Math.min(4096, Math.round(canvas.clientHeight * dpr) || 512));
+		let w = viewW, h = viewH;
+		if (w === 0 || h === 0) {
+			// an OffscreenCanvas (worker) has no layout box: until the
+			// page reports one, render at the default size
+			const dpr = (typeof devicePixelRatio === "number" ? devicePixelRatio : 1);
+			w = Math.round((canvas.clientWidth || 0) * dpr) || 1024;
+			h = Math.round((canvas.clientHeight || 0) * dpr) || 512;
+		}
+		w = Math.max(1, Math.min(4096, w));
+		h = Math.max(1, Math.min(4096, h));
 		if (canvas.width !== w || canvas.height !== h) {
 			canvas.width = w;
 			canvas.height = h;
@@ -206,6 +223,14 @@ function createHwDisplay(canvas, scale) {
 	return {
 		backend: "webgl2-hw",
 		hw,
+		/**
+		 * @param {number} w - element size in device pixels
+		 * @param {number} h
+		 */
+		setViewport(w, h) {
+			viewW = w | 0;
+			viewH = h | 0;
+		},
 		/** @param {import("../gpu/gpu").GPU} gpu */
 		present(gpu) {
 			fitCanvas();
@@ -217,6 +242,7 @@ function createHwDisplay(canvas, scale) {
 				swW = w;
 				swH = h;
 				swPixels = new Uint32Array(w * h);
+				swBytes = new Uint8Array(swPixels.buffer);
 				gl.bindTexture(gl.TEXTURE_2D, swTex);
 				gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
 			}
@@ -227,20 +253,13 @@ function createHwDisplay(canvas, scale) {
 			gl.disable(gl.BLEND);
 			gl.useProgram(prog);
 			gl.bindBuffer(gl.ARRAY_BUFFER, swVbo);
-			gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-				-1, -1, 0, 1,
-				1, -1, 1, 1,
-				-1, 1, 0, 0,
-				1, 1, 1, 0,
-			]), gl.STREAM_DRAW);
 			gl.enableVertexAttribArray(aPos);
 			gl.enableVertexAttribArray(aUv);
 			gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 16, 0);
 			gl.vertexAttribPointer(aUv, 2, gl.FLOAT, false, 16, 8);
 			gl.activeTexture(gl.TEXTURE0);
 			gl.bindTexture(gl.TEXTURE_2D, swTex);
-			gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE,
-				new Uint8Array(swPixels.buffer, 0, w * h * 4));
+			gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, swBytes);
 			gl.uniform1i(gl.getUniformLocation(prog, "uTex"), 0);
 			gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
 		},
@@ -262,18 +281,19 @@ export function gpuScalePreference() {
 }
 
 /**
- * @param {HTMLCanvasElement} canvas
+ * @param {HTMLCanvasElement | OffscreenCanvas} canvas
+ * @param {number} [scale] - hardware renderer scale, 0 = software
+ *   (defaults to the stored preference; workers must pass it)
  * @return {{present: () => void, backend: string, hw?: object}}
  */
-export function createDisplay(canvas) {
-	const scale = gpuScalePreference();
+export function createDisplay(canvas, scale = gpuScalePreference()) {
 	if (scale > 0) {
 		const hwDisp = createHwDisplay(canvas, scale);
 		if (hwDisp !== null) return hwDisp;
 	}
 	const gl = createWebGLDisplay(canvas);
 	if (gl !== null) {
-		return {...gl, backend: "webgl"};
+		return {...gl, backend: "webgl", setViewport() {}};
 	}
-	return {...createCanvas2DDisplay(canvas), backend: "canvas2d"};
+	return {...createCanvas2DDisplay(canvas), backend: "canvas2d", setViewport() {}};
 }

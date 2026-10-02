@@ -33,7 +33,9 @@ function saveBmp(p, rgba, w, h) {
 	fs.writeFileSync(p, buf);
 }
 
-it("boots HP to the title screen and dumps it", () => {
+// opt-in (machine-specific game/BIOS paths): PSX_GAMES=1 npx jest debug.hp
+const RUN = process.env.PSX_GAMES === "1";
+(RUN ? it : it.skip)("boots HP to the title screen and dumps it", () => {
 	const dir = path.dirname(CUE);
 	const entries = parseCue(fs.readFileSync(CUE, "utf8"));
 	const buffers = new Map();

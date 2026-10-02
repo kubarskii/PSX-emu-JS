@@ -31,7 +31,9 @@ function saveBmp(p, rgba, w, h) {
 	fs.writeFileSync(p, buf);
 }
 
-it("dumps Diablo early frames around the copyright screen", () => {
+// opt-in (machine-specific game/BIOS paths): PSX_GAMES=1 npx jest debug.diablo
+const RUN = process.env.PSX_GAMES === "1";
+(RUN ? it : it.skip)("dumps Diablo early frames around the copyright screen", () => {
 	const bin = fs.readFileSync(BIN);
 	const bios = fs.readFileSync(BIOS_PATH);
 	const psx = new PSX();
