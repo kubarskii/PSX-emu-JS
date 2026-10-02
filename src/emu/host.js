@@ -10,7 +10,7 @@
  *   {type: "ready", backend, hwScale}  display created
  *   {type: "jit", mops}               JS engine speed probe (see jit.js)
  *   {type: "status", key}             boot mode (i18n key)
- *   {type: "stats", ips, emulationSpeed}
+ *   {type: "stats", ips, emulationSpeed, fps}  fps = frames presented
  *   {type: "tty", text}               kernel putchar output
  *   {type: "card", data}              memory-card image to persist
  */
@@ -106,12 +106,21 @@ export class EmuHost {
 		if (display.hw !== undefined) psx.gpu.hw = display.hw;
 		psx.setHidden(this.hidden);
 		// in a worker a long tick blocks no UI: catch up over more frames
-		if (typeof document === "undefined") psx.tickBudgetMs = 50;
+		if (typeof document === "undefined") {
+			psx.tickBudgetMs = 50;
+			psx.adaptivePacing = true;
+		}
 		psx.cpu.onTty = (ch) => {
 			this._tty += ch;
 		};
+		this._presents = 0;
+		this._presentStamp = performance.now();
 		psx.onStats = (stats) => {
-			this.emit({type: "stats", ips: stats.ips, emulationSpeed: stats.emulationSpeed});
+			const now = performance.now();
+			const fps = this._presents * 1000 / Math.max(1, now - this._presentStamp);
+			this._presents = 0;
+			this._presentStamp = now;
+			this.emit({type: "stats", ips: stats.ips, emulationSpeed: stats.emulationSpeed, fps});
 		};
 		psx.onFrame = (frames) => this.#frame(frames);
 		if (cfg.card !== null) psx.joypad.card.load(cfg.card);
@@ -176,6 +185,7 @@ export class EmuHost {
 		// hidden player screen needs no frames at all)
 		if (frames === 0 || !this.visible || this.hidden) return;
 		const display = this.display;
+		this._presents++;
 		if (display.hw !== undefined) {
 			display.present(psx.gpu);
 		} else {
